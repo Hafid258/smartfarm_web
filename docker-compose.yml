@@ -1,0 +1,39 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: smartfarm-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+    container_name: smartfarm-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # When running in Docker we want the backend to reach Mongo by service name
+      - MONGO_URI=mongodb://mongo:27017/smartfarm
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:3000/api
+    container_name: smartfarm-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
