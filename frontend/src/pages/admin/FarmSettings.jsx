@@ -62,7 +62,7 @@ export default function FarmSettings() {
   });
 
   async function loadFarms() {
-    const res = await api.get("/admin/farms");
+    const res = await api.get("/farms");
     const list = Array.isArray(res.data) ? res.data : [];
     setFarms(list);
     if (!farmId && list.length) {

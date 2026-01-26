@@ -85,6 +85,7 @@ router.post("/status", resolveFarmId, async (req, res) => {
 
     if (req.body.light_raw_adc !== undefined) update.light_raw_adc = Number(req.body.light_raw_adc);
     if (req.body.light_percent !== undefined) update.light_percent = Number(req.body.light_percent);
+    if (req.body.light_lux !== undefined) update.light_lux = Number(req.body.light_lux);
     if (req.body.light_ok !== undefined) update.light_ok = Boolean(req.body.light_ok);
 
     const doc = await DeviceStatus.findOneAndUpdate(

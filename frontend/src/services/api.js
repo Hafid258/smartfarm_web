@@ -6,29 +6,41 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// ✅ Request Interceptor: แนบ token + แนบ x-farm-id ให้ทั้ง admin และ user
+function isValidObjectIdString(v) {
+  // 24 hex chars
+  return typeof v === "string" && /^[a-fA-F0-9]{24}$/.test(v.trim());
+}
+
 api.interceptors.request.use(
   (config) => {
+    // 1) auth
     const token = localStorage.getItem("token");
     if (token && token !== "undefined") {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const role = localStorage.getItem("role");
+    // 2) ngrok (ถ้า baseURL เป็น ngrok ค่อยใส่ header นี้)
+    const base = String(config.baseURL || "");
+    if (base.includes("ngrok-free.dev")) {
+      config.headers["ngrok-skip-browser-warning"] = "1";
+    }
 
-    // ✅ farmId ของ user
-    const userFarmId = localStorage.getItem("farmId");
-
-    // ✅ farmId ที่ admin เลือก (ถ้ามี) ให้มี priority สูงกว่า
+    // 3) farm context (ส่งเป็น header เท่านั้น)
+    //    - admin: ใช้ admin_farmId ถ้ามี (รองรับหน้า admin ที่เลือกฟาร์ม)
+    //    - fallback: farmId ปกติ
     const adminFarmId = localStorage.getItem("admin_farmId");
+    const farmId = localStorage.getItem("farmId");
 
-    const farmIdToUse =
-      role === "admin"
-        ? (adminFarmId && adminFarmId !== "undefined" ? adminFarmId : userFarmId)
-        : userFarmId;
+    const selected =
+      isValidObjectIdString(adminFarmId) ? adminFarmId.trim()
+      : isValidObjectIdString(farmId) ? farmId.trim()
+      : null;
 
-    if (farmIdToUse && farmIdToUse !== "undefined" && farmIdToUse !== "null") {
-      config.headers["x-farm-id"] = farmIdToUse;
+    if (selected) {
+      config.headers["x-farm-id"] = selected;
+    } else {
+      // กัน header ค้าง
+      delete config.headers["x-farm-id"];
     }
 
     return config;
@@ -36,25 +48,30 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Response Interceptor: ถ้า 401 -> logout
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
-    const status = error?.response?.status;
+  (err) => {
+    const status = err?.response?.status;
 
     if (status === 401) {
+      // token หมดอายุ/ไม่ถูกต้อง → logout
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       localStorage.removeItem("farmId");
       localStorage.removeItem("user");
-
-      // ไม่ลบ admin_farmId เผื่อ admin เลือกไว้แล้ว
-      window.location.replace("/login");
-      return;
+      // ไม่ลบ admin_farmId เพื่อให้ admin เลือกฟาร์มเดิมไว้ได้
+      window.location.href = "/login";
     }
 
-    const message = error?.response?.data?.error || error?.message || "Unknown error occurred";
-    return Promise.reject({ ...error, message });
+    // ส่งข้อความ error ให้หน้าอื่นใช้ได้ง่ายขึ้น
+    const msg =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      "Network Error";
+
+    err.message = msg;
+    return Promise.reject(err);
   }
 );
 

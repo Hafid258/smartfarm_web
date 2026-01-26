@@ -22,16 +22,27 @@ export default function Farms() {
     setErr("");
     try {
       setLoading(true);
-      // list farms for admin (dropdown)
+
+      // ✅ ใช้ /admin/farms สำหรับ admin (มีไว้โดยเฉพาะ) และ fallback ไป /farms
       const [farmRes, userRes] = await Promise.all([
-        api.get("/admin/farms"),
+        api.get("/admin/farms").catch(() => api.get("/farms")),
         api.get("/admin/users?limit=200"),
       ]);
 
-      setItems(Array.isArray(farmRes.data) ? farmRes.data : []);
+      // ✅ รองรับหลายรูปแบบ response: array | {items:[]} | {farms:[]}
+      const farms =
+        Array.isArray(farmRes.data)
+          ? farmRes.data
+          : Array.isArray(farmRes.data?.items)
+            ? farmRes.data.items
+            : Array.isArray(farmRes.data?.farms)
+              ? farmRes.data.farms
+              : [];
+
+      setItems(farms);
       setUsers(Array.isArray(userRes.data) ? userRes.data : userRes.data?.items || []);
     } catch (e) {
-      setErr(e.message || "โหลดฟาร์มไม่สำเร็จ");
+      setErr(e?.message || "โหลดฟาร์มไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
@@ -77,7 +88,7 @@ export default function Farms() {
       setFarmName("");
       await load();
     } catch (e) {
-      toast.error(e.message || "สร้างไม่สำเร็จ");
+      toast.error(e?.message || "สร้างไม่สำเร็จ");
     } finally {
       setSaving(false);
     }
@@ -91,7 +102,7 @@ export default function Farms() {
       toast.success("อัปเดตชื่อฟาร์มแล้ว");
       await load();
     } catch (e) {
-      toast.error(e.message || "อัปเดตไม่สำเร็จ");
+      toast.error(e?.message || "อัปเดตไม่สำเร็จ");
     }
   }
 
@@ -103,69 +114,88 @@ export default function Farms() {
       toast.success("ลบฟาร์มแล้ว");
       await load();
     } catch (e) {
-      toast.error(e.message || "ลบไม่สำเร็จ");
+      toast.error(e?.message || "ลบไม่สำเร็จ");
     }
   }
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="p-6 space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Farms</div>
-          <div className="text-sm text-gray-500">จัดการฟาร์ม (CRUD)</div>
+          <h1 className="text-2xl font-semibold">Farms</h1>
+          <p className="text-sm opacity-70">จัดการฟาร์มในระบบ</p>
         </div>
-        <Button variant="outline" onClick={load} disabled={loading}>
-          รีเฟรช
-        </Button>
+
+        <div className="flex gap-2 items-center">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="ค้นหาฟาร์ม..."
+            className="w-64"
+          />
+        </div>
       </div>
 
-      <Card className="p-5">
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อฟาร์ม..." />
-          <Badge variant="gray">{filtered.length} farms</Badge>
-        </div>
+      {err ? (
+        <Card className="p-4">
+          <div className="text-red-600">{err}</div>
+        </Card>
+      ) : null}
 
-        <div className="mt-4 flex flex-col sm:flex-row gap-2">
-          <Input value={farmName} onChange={(e) => setFarmName(e.target.value)} placeholder="ชื่อฟาร์มใหม่..." />
-          <Button onClick={create} disabled={saving}>
-            {saving ? "กำลังสร้าง..." : "สร้างฟาร์ม"}
-          </Button>
+      <Card className="p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="font-medium">เพิ่มฟาร์มใหม่</div>
+          <div className="flex gap-2">
+            <Input
+              value={farmName}
+              onChange={(e) => setFarmName(e.target.value)}
+              placeholder="ชื่อฟาร์ม"
+              className="w-64"
+            />
+            <Button onClick={create} disabled={saving}>
+              {saving ? "กำลังบันทึก..." : "เพิ่ม"}
+            </Button>
+          </div>
         </div>
       </Card>
 
-      <Card className="p-5">
-        {loading && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <Spinner />
-            <div>กำลังโหลด...</div>
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-medium">
+            รายการฟาร์ม <Badge>{filtered.length}</Badge>
           </div>
-        )}
+        </div>
 
-        {!loading && err && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{err}</div>
-        )}
-
-        {!loading && !err && filtered.length === 0 && <div className="text-sm text-gray-500">ไม่พบฟาร์ม</div>}
-
-        {!loading && !err && filtered.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {filtered.length === 0 ? (
+          <div className="opacity-70">ไม่พบฟาร์ม</div>
+        ) : (
+          <div className="space-y-3">
             {filtered.map((f) => (
-              <div key={f._id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-semibold text-gray-900">{f.farm_name}</div>
-                    <div className="text-sm text-gray-500 mt-1">ผู้ที่เกี่ยวข้อง</div>
+              <div
+                key={f._id}
+                className="border rounded-lg p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{f.farm_name || "-"}</div>
+                  <div className="text-xs opacity-70">
+                    ID: <span className="font-mono">{String(f._id)}</span>
                   </div>
-                  <Badge variant="blue">Farm</Badge>
+                  <div className="text-xs opacity-70">
+                    Users: {renderFarmUsers(String(f._id))}
+                  </div>
                 </div>
 
-                <div className="mt-3 text-sm text-gray-700">
-                  {renderFarmUsers(f._id)}
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <Button variant="outline" onClick={() => rename(f)}>
-                    เปลี่ยนชื่อ
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => rename(f)}>
+                    แก้ไข
                   </Button>
                   <Button variant="danger" onClick={() => remove(f)}>
                     ลบ
@@ -175,13 +205,6 @@ export default function Farms() {
             ))}
           </div>
         )}
-      </Card>
-
-      <Card className="p-5 bg-emerald-50 border-emerald-200">
-        <div className="font-semibold text-emerald-900">หมายเหตุ</div>
-        <div className="text-sm text-emerald-800 mt-1">
-          เพื่อความปลอดภัย แนะนำให้ backend จำกัดสิทธิ์ Farm CRUD เฉพาะ admin เท่านั้น
-        </div>
       </Card>
     </div>
   );

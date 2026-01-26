@@ -1,10 +1,11 @@
 /****************************************************
- * SmartFarm ESP32 (DHT22 + Soil Moisture + LDR Light + 2 Relay)
+ * SmartFarm ESP32 (DHT22 + Soil Analog + BH1750 + 2 Relay)
  * ✅ Works over HTTPS ngrok (WiFiClientSecure + setInsecure)
  *
+ * Endpoints (ตาม backend เดิมของคุณ):
  * - POST /api/device/sensor
- * - POST /api/device-status/status
- * - GET  /api/device/commands/poll
+ * - POST /api/device-status/status?farm_id=...
+ * - GET  /api/device/commands/poll?farm_id=...&device_key=...
  * - POST /api/device/commands/ack
  ****************************************************/
 
@@ -13,6 +14,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "DHT.h"
+#include <Wire.h>
+#include <BH1750.h>
 
 // ------------------ WiFi ------------------
 const char* WIFI_SSID = "Gggg";
@@ -35,18 +38,27 @@ String EP_HEALTH = String(API_BASE) + "/health";
 #define DHTTYPE DHT22
 
 const int PIN_SOIL_ADC  = 34;
-const int PIN_LIGHT_ADC = 35;
 
 const int RELAY1_PIN = 26; // pump
 const int RELAY2_PIN = 27; // spare
-const bool RELAY_ACTIVE_LOW = true; // ถ้ารีเลย์ไม่ทำงานให้ลอง false
+const bool RELAY_ACTIVE_LOW = true; // ถ้ารีเลย์ทำงานกลับด้าน ให้สลับค่า
 
-// ------------------ Calibration ------------------
+// ------------------ BH1750 (I2C) ------------------
+BH1750 lightMeter;
+bool bhOk = false;                         // ✅ NEW: BH1750 ready flag
+unsigned long lastBhInitMs = 0;            // ✅ NEW: retry init
+const unsigned long BH_INIT_RETRY_MS = 15000UL;
+
+// ------------------ Calibration (soil) ------------------
 int soilDryADC = 3200;
 int soilWetADC = 1500;
 
-int lightMinADC = 0;
-int lightMaxADC = 4095;
+// ------------------ AUTO config (ผักบุ้งจีน) ------------------
+const int AUTO_ON_PCT = 35;                 // ≤35% = แห้ง
+const int AUTO_WATER_SEC = 15;              // รดครั้งละ 15 วิ
+const unsigned long AUTO_COOLDOWN_MS = 60UL * 1000UL; // เว้น 60 วิ
+const float AUTO_MAX_LUX = 15000.0;         // ถ้าแดดแรงกว่า 15000 lux งดรด
+unsigned long lastAutoWaterMs = 0;
 
 // ------------------ Timing ------------------
 unsigned long lastSensorMs = 0;
@@ -64,9 +76,10 @@ bool pumpRunning = false;
 unsigned long pumpStopAtMs = 0;
 unsigned long pumpStartedAtMs = 0;
 
-// Track ON command id (ack after watering done)
+// MANUAL tracking
+bool manualActive = false;          // true เมื่อมีคำสั่งจากเว็บ / กำลังรันตามคำสั่ง
 String pendingOnCommandId = "";
-String lastCommandId = ""; // ✅ กันรันซ้ำ
+String lastCommandId = "";          // กันรันซ้ำ
 
 // DHT
 DHT dht(DHTPIN, DHTTYPE);
@@ -94,9 +107,56 @@ int soilPercentFromADC(int adc) {
   return clampInt((int)pct, 0, 100);
 }
 
-int lightPercentFromADC(int adc) {
-  long pct = map(adc, lightMinADC, lightMaxADC, 0, 100);
+// lux -> percent (เผื่อหน้าเว็บเดิมใช้ light_percent)
+int lightPercentFromLux(float lux) {
+  long pct = (long)((lux / 20000.0f) * 100.0f);
   return clampInt((int)pct, 0, 100);
+}
+
+// ------------------ I2C scan (ช่วยเช็ค ADDR=LOW => 0x23) ------------------
+void i2cScanOnce() {
+  Serial.println("I2C scan...");
+  int found = 0;
+  for (uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    uint8_t err = Wire.endTransmission();
+    if (err == 0) {
+      Serial.print("  Found: 0x");
+      Serial.println(addr, HEX);
+      found++;
+    }
+  }
+  if (!found) Serial.println("  (No I2C devices found)");
+}
+
+// ------------------ BH1750 init/read ------------------
+void initBH1750() {
+  // ADDR=LOW: ปกติคือ 0x23 และ begin(mode) จะใช้ default address อยู่แล้ว
+  bhOk = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+  lastBhInitMs = millis();
+
+  if (bhOk) Serial.println("[BH1750] OK (ADDR=LOW ~0x23)");
+  else Serial.println("[BH1750] begin() failed -> wiring/I2C/address problem");
+}
+
+void ensureBH1750() {
+  if (bhOk) return;
+  if (millis() - lastBhInitMs < BH_INIT_RETRY_MS) return;
+  Serial.println("[BH1750] retry init...");
+  initBH1750();
+}
+
+// อ่าน lux แบบปลอดภัย: ถ้า BH ไม่พร้อม -> return NAN
+float readLuxSafe() {
+  ensureBH1750();
+  if (!bhOk) return NAN;
+
+  float lux = lightMeter.readLightLevel();
+
+  // กันค่าพัง (ติดลบ/NaN)
+  if (!isfinite(lux) || lux < 0) return NAN;
+
+  return lux;
 }
 
 // ------------------ HTTPS helpers ------------------
@@ -114,6 +174,8 @@ String httpPostJson(const String& url, const String& json) {
   }
 
   http.addHeader("Content-Type", "application/json");
+  // ✅ NEW: ngrok skip warning (ช่วยให้ไม่โดนหน้า HTML)
+  http.addHeader("ngrok-skip-browser-warning", "1");
 
   int code = http.POST((uint8_t*)json.c_str(), json.length());
   String body = http.getString();
@@ -141,6 +203,9 @@ String httpGet(const String& url) {
     Serial.printf("[GET] begin() failed: %s\n", url.c_str());
     return "";
   }
+
+  // ✅ NEW: ngrok skip warning
+  http.addHeader("ngrok-skip-browser-warning", "1");
 
   int code = http.GET();
   String body = http.getString();
@@ -182,7 +247,7 @@ void ensureWiFi() {
 // ------------------ Pump control ------------------
 void startPumpForSeconds(int sec) {
   sec = clampInt(sec, 1, 3600);
-  relayWrite(RELAY1_PIN, false);///false
+  relayWrite(RELAY1_PIN, true);
   pumpRunning = true;
   pumpStartedAtMs = millis();
   pumpStopAtMs = millis() + (unsigned long)sec * 1000UL;
@@ -190,7 +255,7 @@ void startPumpForSeconds(int sec) {
 }
 
 void stopPump() {
-  relayWrite(RELAY1_PIN, true);///true
+  relayWrite(RELAY1_PIN, false);
   pumpRunning = false;
   pumpStopAtMs = 0;
   Serial.println("Pump OFF");
@@ -214,8 +279,11 @@ void sendStatus() {
   doc["ip"] = WiFi.localIP().toString();
   doc["wifi_rssi"] = WiFi.RSSI();
   doc["pump_state"] = pumpRunning ? "ON" : "OFF";
-  doc["fw_version"] = "v1.0.0";
+  doc["fw_version"] = "v1.1.1"; // ✅ bump
   doc["uptime_sec"] = (int)(millis() / 1000UL);
+
+  // ✅ ส่งสถานะ BH1750 ด้วย จะได้รู้ว่า sensor พร้อมไหม
+  doc["bh1750_ok"] = bhOk;
 
   String payload;
   serializeJson(doc, payload);
@@ -232,12 +300,14 @@ void sendSensor() {
   if (!dhtOk) Serial.println("DHT read failed");
 
   int soilADC  = analogRead(PIN_SOIL_ADC);
-  int lightADC = analogRead(PIN_LIGHT_ADC);
-
   int soilPct  = soilPercentFromADC(soilADC);
-  int lightPct = lightPercentFromADC(lightADC);
 
-  DynamicJsonDocument doc(768);
+  // ✅ ใช้ safe read
+  float lux = readLuxSafe();
+  bool luxOk = isfinite(lux);
+  int lightPct = luxOk ? lightPercentFromLux(lux) : 0;
+
+  DynamicJsonDocument doc(1024);
   doc["farm_id"] = FARM_ID;
   doc["device_key"] = DEVICE_KEY;
 
@@ -252,15 +322,31 @@ void sendSensor() {
   doc["soil_raw_adc"]  = soilADC;
   doc["soil_moisture"] = soilPct;
 
-  doc["light_raw_adc"] = lightADC;
-  doc["light_percent"] = lightPct;
+  // ✅ ส่ง lux เฉพาะเมื่ออ่านได้จริง (ไม่ส่ง -2)
+  if (luxOk) {
+    doc["light_lux"] = (double)lux;
+    doc["light_percent"] = lightPct;
+  } else {
+    // จะส่งเป็น null เพื่อให้ backend/เว็บรู้ว่าอ่านไม่ได้
+    doc["light_lux"] = nullptr;
+    doc["light_percent"] = nullptr;
+  }
+
+  doc["pump_running"] = pumpRunning;
+  doc["mode"] = manualActive ? "MANUAL" : "AUTO";
 
   String payload;
   serializeJson(doc, payload);
 
   httpPostJson(EP_SENSOR, payload);
 
-  Serial.printf("SOIL=%d%% adc=%d | LIGHT=%d%% adc=%d\n", soilPct, soilADC, lightPct, lightADC);
+  Serial.printf("SOIL=%d%% adc=%d | LUX=%s | MODE=%s | PUMP=%s | BH=%s\n",
+    soilPct, soilADC,
+    luxOk ? String(lux, 0).c_str() : "N/A",
+    manualActive ? "MANUAL" : "AUTO",
+    pumpRunning ? "ON" : "OFF",
+    bhOk ? "OK" : "FAIL"
+  );
 }
 
 void sendAck(const char* commandId, const char* status, int actualDurationSec) {
@@ -282,7 +368,6 @@ void pollCommands() {
   if (WiFi.status() != WL_CONNECTED) return;
 
   String body = httpGet(EP_POLL);
-  Serial.printf("Poll body len=%d\n", body.length());
   if (body.length() < 5) return;
 
   StaticJsonDocument<2048> doc;
@@ -296,22 +381,22 @@ void pollCommands() {
   const char* cmd = doc["command"] | "";
   int duration = doc["duration_sec"] | 0;
 
-  Serial.printf("Parsed id=%s cmd=%s duration=%d\n", id, cmd, duration);
-
   if (strlen(id) == 0 || strlen(cmd) == 0) return;
 
-  if (lastCommandId == String(id)) return; // ✅ กันรันซ้ำ
+  if (lastCommandId == String(id)) return;
   lastCommandId = String(id);
 
   String cmdStr = String(cmd);
   Serial.printf("Got command: %s id=%s duration=%d\n", cmdStr.c_str(), id, duration);
 
   if (cmdStr == "ON") {
+    manualActive = true;
     if (!pumpRunning) {
       pendingOnCommandId = id;
       startPumpForSeconds(duration > 0 ? duration : 30);
     }
   } else if (cmdStr == "OFF") {
+    manualActive = false;
     stopPump();
     sendAck(id, "done", 0);
   } else {
@@ -331,6 +416,35 @@ void ackIfOnFinished() {
   sendAck(pendingOnCommandId.c_str(), "done", actualSec);
   pendingOnCommandId = "";
   pumpStartedAtMs = 0;
+
+  manualActive = false;
+}
+
+// ------------------ AUTO logic ------------------
+void autoWateringStep() {
+  if (manualActive || pumpRunning) return;
+  if ((millis() - lastAutoWaterMs) < AUTO_COOLDOWN_MS) return;
+
+  int soilADC  = analogRead(PIN_SOIL_ADC);
+  int soilPct  = soilPercentFromADC(soilADC);
+
+  float lux = readLuxSafe();
+  bool luxOk = isfinite(lux);
+
+  // ✅ ถ้าอ่าน lux ไม่ได้: อย่าใช้ lux เป็นเงื่อนไขงดรด (เลือกนโยบาย)
+  // ที่นี่ผมเลือก "ถ้า lux ไม่ได้ -> ไม่งดด้วย lux"
+  if (luxOk && lux > AUTO_MAX_LUX) {
+    Serial.printf("[AUTO] Skip (lux %.0f > %.0f)\n", lux, AUTO_MAX_LUX);
+    return;
+  }
+
+  if (soilPct <= AUTO_ON_PCT) {
+    lastAutoWaterMs = millis();
+    startPumpForSeconds(AUTO_WATER_SEC);
+    Serial.printf("[AUTO] Soil %d%% -> Water %d sec (lux %s)\n",
+                  soilPct, AUTO_WATER_SEC,
+                  luxOk ? String(lux, 0).c_str() : "N/A");
+  }
 }
 
 // ------------------ Setup/Loop ------------------
@@ -345,6 +459,12 @@ void setup() {
   analogReadResolution(12);
   dht.begin();
 
+  // ✅ I2C init + scan + BH init
+  Wire.begin(21, 22);
+  delay(100);
+  i2cScanOnce();      // ✅ จะเห็น 0x23 ถ้า ADDR=LOW ต่อถูก
+  initBH1750();       // ✅ ตั้ง bhOk
+
   ensureWiFi();
 
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
@@ -358,6 +478,7 @@ void loop() {
 
   handlePumpAutoStop();
   ackIfOnFinished();
+  autoWateringStep();
 
   unsigned long now = millis();
 

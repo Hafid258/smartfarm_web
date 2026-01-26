@@ -20,6 +20,7 @@ const DeviceStatusSchema = new mongoose.Schema(
 
     light_raw_adc: { type: Number, default: null },
     light_percent: { type: Number, default: null },
+    light_lux: { type: Number, default: null },
 
     last_seen_at: { type: Date, default: Date.now },
   },

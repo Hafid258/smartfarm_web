@@ -54,7 +54,13 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-farm-id", "device_key"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "x-farm-id",
+    "device_key",
+    "ngrok-skip-browser-warning", // ✅ เพิ่มบรรทัดนี้ เพื่อให้ ngrok header ผ่าน preflight
+  ],
 };
 
 app.use(cors(corsOptions));

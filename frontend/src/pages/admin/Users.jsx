@@ -39,7 +39,7 @@ export default function Users() {
     setErr("");
     try {
       setLoading(true);
-      const [uRes, fRes] = await Promise.all([api.get("/admin/users"), api.get("/admin/farms")]);
+      const [uRes, fRes] = await Promise.all([api.get("/admin/users"), api.get("/farms")]);
 
       // ✅ รองรับ backend 2 แบบ:
       // 1) แบบเก่า: uRes.data = []

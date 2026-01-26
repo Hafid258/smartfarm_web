@@ -19,6 +19,7 @@ const schema = new mongoose.Schema(
     // ✅ LDR Light
     light_raw_adc: { type: Number },     // 0..4095
     light_percent: { type: Number },     // 0..100
+    light_lux: { type: Number },         // lux
   },
   { versionKey: false }
 );

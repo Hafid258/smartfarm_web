@@ -99,12 +99,26 @@ function statusSoil(soil) {
   return "good";
 }
 
-function statusLight(lightPct) {
-  if (lightPct === null || lightPct === undefined) return "normal";
-  const v = Number(lightPct);
+function lightLuxFromPercent(percent, maxLux = 20000) {
+  if (percent === null || percent === undefined) return null;
+  const v = Number(percent);
+  if (Number.isNaN(v)) return null;
+  const lux = (v / 100) * maxLux;
+  return Math.max(0, lux);
+}
+
+function lightLuxValue(row) {
+  if (!row) return null;
+  if (row.light_lux !== null && row.light_lux !== undefined) return Number(row.light_lux);
+  return lightLuxFromPercent(row.light_percent);
+}
+
+function statusLightLux(lightLux) {
+  if (lightLux === null || lightLux === undefined) return "normal";
+  const v = Number(lightLux);
   if (Number.isNaN(v)) return "normal";
-  if (v < 20) return "danger";
-  if (v < 40) return "warning";
+  if (v < 2000) return "danger";
+  if (v < 4000) return "warning";
   return "good";
 }
 
@@ -184,17 +198,15 @@ const METRIC_INFO = {
 • อันตราย: <30%  
 `,
   },
-  light_percent: {
-    title: "แสง (LDR)",
-    unit: "%",
+  light_lux: {
+    title: "แสง (Lux)",
+    unit: "lux",
     desc: `
-ค่าความเข้มแสงจาก LDR (0–100%)
+ค่าความเข้มแสงจาก BH1750 (หน่วย lux)
 
-• ค่าน้อยมาก (เช่น <20%) หมายถึงมืด
-• ค่ากลาง (20–40%) แสงน้อย
-• ค่าสูง (>40%) แสงมาก
-
-หมายเหตุ: ค่าเป็นเชิงสัมพัทธ์ ขึ้นกับการคาลิเบรตเซ็นเซอร์
+• ค่าน้อยมาก (<2,000 lux) หมายถึงแสงน้อย
+• ค่ากลาง (2,000–4,000 lux) แสงปานกลาง
+• ค่าสูง (>4,000 lux) แสงมาก
 `,
   },
 
@@ -252,7 +264,7 @@ const CHARTS = [
   { id: "temperature", label: "อุณหภูมิ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
   { id: "humidity_air", label: "ความชื้นอากาศ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
   { id: "soil_moisture", label: "ความชื้นดิน (%)", type: "sensor", dataKey: "soil_moisture", unit: "%" },
-  { id: "light_percent", label: "แสง (LDR %) ", type: "sensor", dataKey: "light_percent", unit: "%" },
+  { id: "light_lux", label: "แสง (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
 
   { id: "vpd", label: "VPD (kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
   { id: "gdd", label: "GDD (°C)", type: "index", dataKey: "gdd", unit: "°C" },
@@ -333,7 +345,8 @@ export default function Dashboard() {
   const [visibleCharts, setVisibleCharts] = useState(() => {
     try {
       const saved = localStorage.getItem("dashboard_visibleCharts");
-      return saved ? JSON.parse(saved) : defaultVisibleCharts;
+      const parsed = saved ? JSON.parse(saved) : defaultVisibleCharts;
+      return parsed.map((id) => (id === "light_percent" ? "light_lux" : id));
     } catch {
       return defaultVisibleCharts;
     }
@@ -371,11 +384,18 @@ export default function Dashboard() {
 
   const loadFarms = useCallback(async () => {
     try {
-      const res = await api.get("/admin/farms");
+      const res = await api.get("/farms");
       const list = Array.isArray(res.data) ? res.data : [];
       setFarms(list);
 
-      if (!farmId && list.length) {
+      if (!list.length) {
+        setLoading(false);
+        setErr("ยังไม่มีฟาร์มในระบบ");
+        return;
+      }
+
+      const hasCurrent = farmId && list.some((f) => String(f._id) === String(farmId));
+      if (!hasCurrent) {
         const id = list[0]._id;
         setFarmId(id);
         localStorage.setItem("admin_farmId", id);
@@ -514,6 +534,13 @@ export default function Dashboard() {
     if (!selectedDate) return indexHistory;
     return indexHistory.filter((x) => isSameDay(x.timestamp, selectedDate));
   }, [indexHistory, selectedDate]);
+
+  const chartHistory = useMemo(() => {
+    return filteredHistory.map((x) => ({
+      ...x,
+      light_lux: lightLuxValue(x),
+    }));
+  }, [filteredHistory]);
 
   // ✅ latest ของวันนั้น (เอาค่าล่าสุดของวัน)
   const latestShow = useMemo(() => {
@@ -1137,13 +1164,13 @@ export default function Dashboard() {
             <SummaryCard
               title={
                 <>
-                  แสง (LDR)
-                  <div className="text-xs text-gray-500 mt-1">- %</div>
+                  แสง (lux)
+                  <div className="text-xs text-gray-500 mt-1">- lux</div>
                 </>
               }
-              value={fmt(latestShow?.light_percent, 0)}
-              status={statusLight(latestShow?.light_percent)}
-              onClick={() => setOpenMetric("light_percent")}
+              value={fmt(lightLuxValue(latestShow), 0)}
+              status={statusLightLux(lightLuxValue(latestShow))}
+              onClick={() => setOpenMetric("light_lux")}
             />
 
             <SummaryCard
@@ -1261,7 +1288,7 @@ export default function Dashboard() {
                   key={c.id}
                   title={c.label}
                   unit={c.unit}
-                  data={c.type === "sensor" ? filteredHistory : filteredIndexHistory}
+                  data={c.type === "sensor" ? chartHistory : filteredIndexHistory}
                   dataKey={c.dataKey}
                   xKey="timestamp"
                 />

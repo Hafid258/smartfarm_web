@@ -168,6 +168,7 @@ router.post("/sensor", async (req, res) => {
     // ✅ แสง
     const light_percent = Number(req.body.light_percent ?? 0);
     const light_raw_adc = Number(req.body.light_raw_adc ?? 0);
+    const light_lux = req.body.light_lux !== undefined ? Number(req.body.light_lux) : null;
 
     const storeFarmId = farmIdForStore(farm_id);
 
@@ -181,6 +182,7 @@ router.post("/sensor", async (req, res) => {
       soil_raw_adc,
       light_percent,
       light_raw_adc,
+      light_lux,
     });
 
     // 2) IndexData

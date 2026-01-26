@@ -51,11 +51,33 @@ function statusRH(rh) {
   return "good";
 }
 
-function statusLight(lightPct) {
-  if (lightPct === null || lightPct === undefined) return "normal";
-  const l = Number(lightPct);
-  if (l < 10) return "warning";
-  if (l > 95) return "warning";
+function lightPercentFromLux(lux, maxLux = 20000) {
+  if (lux === null || lux === undefined) return null;
+  const v = Number(lux);
+  if (Number.isNaN(v)) return null;
+  const pct = (v / maxLux) * 100;
+  return Math.max(0, Math.min(100, pct));
+}
+
+function lightLuxFromPercent(percent, maxLux = 20000) {
+  if (percent === null || percent === undefined) return null;
+  const v = Number(percent);
+  if (Number.isNaN(v)) return null;
+  const lux = (v / 100) * maxLux;
+  return Math.max(0, lux);
+}
+
+function lightLuxValue(row) {
+  if (!row) return null;
+  if (row.light_lux !== null && row.light_lux !== undefined) return Number(row.light_lux);
+  return lightLuxFromPercent(row.light_percent);
+}
+
+function statusLightLux(lightLux) {
+  const pct = lightPercentFromLux(lightLux);
+  if (pct === null) return "normal";
+  if (pct < 10) return "warning";
+  if (pct > 95) return "warning";
   return "good";
 }
 
@@ -131,7 +153,7 @@ const CHARTS = [
   { id: "temperature", label: "อุณหภูมิ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
   { id: "humidity_air", label: "ความชื้นอากาศ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
   { id: "soil_moisture", label: "ความชื้นดิน (%)", type: "sensor", dataKey: "soil_moisture", unit: "%" },
-  { id: "light_percent", label: "แสง (%)", type: "sensor", dataKey: "light_percent", unit: "%" },
+  { id: "light_lux", label: "แสง (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
 
   { id: "vpd", label: "VPD (kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
   { id: "gdd", label: "GDD (°C)", type: "index", dataKey: "gdd", unit: "°C" },
@@ -232,11 +254,12 @@ export default function Dashboard() {
   const [exportMonths, setExportMonths] = useState([]);
   const exportMenuRef = useRef(null);
 
-  const defaultVisibleCharts = ["temperature", "humidity_air", "soil_moisture", "light_percent", "vpd"];
+  const defaultVisibleCharts = ["temperature", "humidity_air", "soil_moisture", "light_lux", "vpd"];
   const [visibleCharts, setVisibleCharts] = useState(() => {
     try {
       const saved = localStorage.getItem("user_dashboard_visibleCharts");
-      return saved ? JSON.parse(saved) : defaultVisibleCharts;
+      const parsed = saved ? JSON.parse(saved) : defaultVisibleCharts;
+      return parsed.map((id) => (id === "light_percent" ? "light_lux" : id));
     } catch {
       return defaultVisibleCharts;
     }
@@ -412,7 +435,7 @@ export default function Dashboard() {
         temperature: Number(d.temperature ?? 0),
         humidity_air: Number(d.humidity_air ?? 0),
         soil_moisture: Number(d.soil_moisture ?? 0),
-        light_percent: Number(d.light_percent ?? 0),
+        light_lux: lightLuxValue(d),
       }));
   }, [filteredSensorHistory]);
 
@@ -527,6 +550,7 @@ export default function Dashboard() {
               soil_raw_adc: x.soil_raw_adc,
               light_percent: x.light_percent,
               light_raw_adc: x.light_raw_adc,
+              light_lux: x.light_lux,
             }))
           ),
           "SensorHistory"
@@ -895,7 +919,7 @@ export default function Dashboard() {
             <SummaryCard title={<>อุณหภูมิ<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(latestShow?.temperature, 1)} status={statusTemp(latestShow?.temperature)} />
             <SummaryCard title={<>ความชื้นอากาศ<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.humidity_air, 0)} status={statusRH(latestShow?.humidity_air)} />
             <SummaryCard title={<>ความชื้นดิน<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.soil_moisture, 0)} status={statusSoil(latestShow?.soil_moisture)} />
-            <SummaryCard title={<>แสง<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.light_percent, 0)} status={statusLight(latestShow?.light_percent)} />
+            <SummaryCard title={<>แสง<div className="text-xs text-gray-500 mt-1">- lux</div></>} value={fmt(lightLuxValue(latestShow), 0)} status={statusLightLux(lightLuxValue(latestShow))} />
 
             <SummaryCard title={<>VPD<div className="text-xs text-gray-500 mt-1">- kPa</div></>} value={fmt(indexLatestShow?.vpd, 2)} status={statusVPD(indexLatestShow?.vpd)} />
             <SummaryCard title={<>GDD<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(indexLatestShow?.gdd, 2)} status={statusGDD(indexLatestShow?.gdd)} />
