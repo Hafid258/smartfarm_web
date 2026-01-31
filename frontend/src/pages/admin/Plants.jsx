@@ -92,8 +92,8 @@ export default function Plants() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Plants</div>
-          <div className="text-sm text-gray-500">ตั้งค่า Plant profile ต่อฟาร์ม (upsert)</div>
+          <div className="text-2xl font-bold text-gray-900">ข้อมูลพืช</div>
+          <div className="text-sm text-gray-500">ตั้งค่าข้อมูลพืชรายฟาร์ม (แนะนำสำหรับผักบุ้ง)</div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -102,7 +102,7 @@ export default function Plants() {
             value={farmId}
             onChange={(e) => setFarmId(e.target.value)}
           >
-            {farms.length === 0 ? <option value="">No farms</option> : farms.map((f) => (
+            {farms.length === 0 ? <option value="">ไม่มีฟาร์ม</option> : farms.map((f) => (
               <option key={f._id} value={f._id}>{f.farm_name}</option>
             ))}
           </select>
@@ -129,17 +129,17 @@ export default function Plants() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-3">
               <div>
-                <div className="text-sm text-gray-600 mb-1">Plant Name</div>
+                <div className="text-sm text-gray-600 mb-1">ชื่อพืช</div>
                 <Input value={form.plant_name} onChange={(e) => setForm((p) => ({ ...p, plant_name: e.target.value }))} />
               </div>
 
               <div>
-                <div className="text-sm text-gray-600 mb-1">Plant Type</div>
+                <div className="text-sm text-gray-600 mb-1">ประเภทพืช</div>
                 <Input value={form.plant_type} onChange={(e) => setForm((p) => ({ ...p, plant_type: e.target.value }))} />
               </div>
 
               <div>
-                <div className="text-sm text-gray-600 mb-1">Base Temperature</div>
+                <div className="text-sm text-gray-600 mb-1">อุณหภูมิฐาน (ใช้คำนวณ GDD)</div>
                 <Input
                   type="number"
                   value={form.base_temperature}
@@ -148,7 +148,7 @@ export default function Plants() {
               </div>
 
               <div>
-                <div className="text-sm text-gray-600 mb-1">Planting Date</div>
+                <div className="text-sm text-gray-600 mb-1">วันที่ปลูก</div>
                 <Input
                   type="date"
                   value={form.planting_date}
@@ -158,9 +158,9 @@ export default function Plants() {
             </div>
 
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="font-semibold text-emerald-900">Tip</div>
+              <div className="font-semibold text-emerald-900">คำแนะนำ</div>
               <div className="text-sm text-emerald-800 mt-1">
-                ข้อมูล Plant ใช้ต่อยอดคำนวณ GDD หรือแสดงข้อมูลเชิงเกษตรใน dashboard ได้
+                ข้อมูลพืชจะช่วยคำนวณ GDD และแสดงข้อมูลการเติบโตของผักบุ้งได้แม่นยำขึ้น
               </div>
             </div>
           </div>

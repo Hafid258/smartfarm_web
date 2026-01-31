@@ -150,15 +150,15 @@ function monthRange(monthStr) {
 }
 
 const CHARTS = [
-  { id: "temperature", label: "อุณหภูมิ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
+  { id: "temperature", label: "อุณหภูมิอากาศ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
   { id: "humidity_air", label: "ความชื้นอากาศ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
   { id: "soil_moisture", label: "ความชื้นดิน (%)", type: "sensor", dataKey: "soil_moisture", unit: "%" },
-  { id: "light_lux", label: "แสง (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
+  { id: "light_lux", label: "แสงที่พืชได้รับ (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
 
-  { id: "vpd", label: "VPD (kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
-  { id: "gdd", label: "GDD (°C)", type: "index", dataKey: "gdd", unit: "°C" },
+  { id: "vpd", label: "ความแห้งของอากาศ (VPD, kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
+  { id: "gdd", label: "ความร้อนสะสม (GDD, °C)", type: "index", dataKey: "gdd", unit: "°C" },
   { id: "dew_point", label: "จุดน้ำค้าง (°C)", type: "index", dataKey: "dew_point", unit: "°C" },
-  { id: "soil_drying_rate", label: "อัตราดินแห้ง (%/min)", type: "index", dataKey: "soil_drying_rate", unit: "%/min" },
+  { id: "soil_drying_rate", label: "ความเร็วที่ดินแห้ง (%/นาที)", type: "index", dataKey: "soil_drying_rate", unit: "%/min" },
 ];
 
 function getIndexInsights({ latest, indexLatest }) {
@@ -176,7 +176,7 @@ function getIndexInsights({ latest, indexLatest }) {
     insights.push({
       title: "อากาศแห้งมาก (VPD สูง)",
       level: "danger",
-      message: "ควรเพิ่มความชื้น/ลดความร้อน และตรวจดินให้ชื้นเพียงพอ (อาจต้องรดน้ำเพิ่ม)",
+      message: "ผักบุ้งชอบความชื้น ควรเพิ่มความชื้น/ลดความร้อน และดูให้ดินชื้นพอ",
     });
   } else if (vpd < 0.4) {
     insights.push({
@@ -186,18 +186,18 @@ function getIndexInsights({ latest, indexLatest }) {
     });
   } else {
     insights.push({
-      title: "VPD อยู่ในช่วงโอเค",
+      title: "อากาศอยู่ในช่วงเหมาะสม",
       level: "good",
-      message: "สภาพอากาศเหมาะสมต่อการคายน้ำและการเติบโต รักษาสภาพแวดล้อมให้คงที่",
+      message: "สภาพแวดล้อมเหมาะต่อการเติบโตของผักบุ้ง รักษาให้คงที่",
     });
   }
 
   const diff = temp - dew;
   if (diff <= 2) {
     insights.push({
-      title: "เสี่ยงน้ำค้าง (Temp ใกล้ Dew Point)",
+      title: "เสี่ยงเกิดน้ำค้าง",
       level: "warning",
-      message: "ควรเพิ่มพัดลม/ระบายอากาศ ลด RH เพื่อป้องกันเชื้อรา",
+      message: "ควรเพิ่มพัดลม/ระบายอากาศ ลดความชื้นเพื่อลดความเสี่ยงเชื้อรา",
     });
   }
 
@@ -205,13 +205,13 @@ function getIndexInsights({ latest, indexLatest }) {
     insights.push({
       title: "ดินแห้งเร็ว",
       level: "danger",
-      message: "ควรตรวจระบบน้ำ/เพิ่มรอบ watering หรือคลุมดินลดการระเหย",
+      message: "ควรตรวจระบบน้ำ/เพิ่มรอบรดน้ำ หรือคลุมดินลดการระเหย",
     });
   } else if (soilDry < 0.02 && soil > 70) {
     insights.push({
       title: "ดินชื้นมาก",
       level: "warning",
-      message: "ระวังน้ำขัง/รากเน่า อาจลด watering และตรวจการระบายน้ำ",
+      message: "ระวังน้ำขัง/รากเน่า อาจลดรอบรดน้ำและตรวจการระบายน้ำ",
     });
   }
 
@@ -501,7 +501,8 @@ export default function Dashboard() {
     try {
       setPumpBusy(true);
       await api.post("/device/command", { command });
-      toast.success(`ส่งคำสั่งปั๊ม: ${command} สำเร็จ`);
+      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
+      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
     } catch (e) {
       toast.error(e?.response?.data?.error || e.message || "ส่งคำสั่งไม่สำเร็จ");
     } finally {
@@ -512,7 +513,7 @@ export default function Dashboard() {
   const exportExcel = useCallback(async () => {
     try {
       setExportBusy(true);
-      toast.info("กำลังส่งออก Excel...");
+      toast.info("กำลังส่งออกไฟล์ Excel...");
 
       const baseSensorHistory = selectedDate ? filteredSensorHistory : sensorHistory;
       const baseIndexHistory = selectedDate ? filteredIndexHistory : indexHistory;
@@ -634,10 +635,10 @@ export default function Dashboard() {
       const filename = `SmartFarm_UserDashboard${suffix}.xlsx`;
 
       saveAs(file, filename);
-      toast.success("Export Excel สำเร็จ 🎉");
+      toast.success("ส่งออกไฟล์ Excel สำเร็จ 🎉");
     } catch (e) {
       console.error("Export Excel error:", e);
-      toast.error(e?.response?.data?.error || e.message || "ส่งออก Excel ไม่สำเร็จ");
+      toast.error(e?.response?.data?.error || e.message || "ส่งออกไฟล์ไม่สำเร็จ");
     } finally {
       setExportBusy(false);
     }
@@ -656,10 +657,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <Modal open={openExportModal} title="เลือกข้อมูลสำหรับ Export" onClose={() => setOpenExportModal(false)}>
+      <Modal open={openExportModal} title="เลือกข้อมูลที่จะส่งออก" onClose={() => setOpenExportModal(false)}>
         <div className="space-y-4">
           <div>
-            <div className="text-sm text-gray-600 mb-1">เลือกเดือน (เฉพาะที่มีข้อมูล)</div>
+            <div className="text-sm text-gray-600 mb-1">เลือกเดือน (เฉพาะเดือนที่มีข้อมูล)</div>
             <div className="flex flex-wrap gap-2 items-center">
               <select
                 value={exportMonth}
@@ -673,9 +674,7 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-              <Button variant="outline" onClick={() => setExportMonth("")}>
-                ล้างเดือน
-              </Button>
+              <Button variant="outline" onClick={() => setExportMonth("")}>ล้างเดือน</Button>
             </div>
           </div>
 
@@ -686,7 +685,7 @@ export default function Dashboard() {
                 checked={exportOptions.sensor}
                 onChange={(e) => setExportOptions((p) => ({ ...p, sensor: e.target.checked }))}
               />
-              Sensor History
+              ประวัติค่าเซนเซอร์
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -694,7 +693,7 @@ export default function Dashboard() {
                 checked={exportOptions.index}
                 onChange={(e) => setExportOptions((p) => ({ ...p, index: e.target.checked }))}
               />
-              Index History
+              ค่าคำนวณ (Index)
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -702,7 +701,7 @@ export default function Dashboard() {
                 checked={exportOptions.settings}
                 onChange={(e) => setExportOptions((p) => ({ ...p, settings: e.target.checked }))}
               />
-              Settings
+              ค่าตั้งระบบ
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -710,7 +709,7 @@ export default function Dashboard() {
                 checked={exportOptions.notifications}
                 onChange={(e) => setExportOptions((p) => ({ ...p, notifications: e.target.checked }))}
               />
-              Notifications
+              การแจ้งเตือน
             </label>
           </div>
 
@@ -734,9 +733,9 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">User Dashboard</div>
+          <div className="text-2xl font-bold text-gray-900">ภาพรวมแปลงผักบุ้ง</div>
           <div className="text-sm text-gray-500 flex items-center gap-2">
-            <span>ดูข้อมูลฟาร์มของฉัน</span>
+            <span>ดูข้อมูลสำหรับการปลูกผักบุ้งของคุณ</span>
             {refreshing ? <Badge variant="blue">กำลังอัปเดต…</Badge> : null}
             {lastUpdatedAt ? (
               <span className="text-xs text-gray-400">อัปเดตล่าสุด: {lastUpdatedAt.toLocaleTimeString()}</span>
@@ -746,11 +745,11 @@ export default function Dashboard() {
 
         <div className="flex flex-wrap gap-2 justify-end">
           <Button variant="outline" onClick={() => setOpenChartPicker((v) => !v)}>
-            {openChartPicker ? "ปิดตัวเลือกกราฟ" : "เลือกกราฟที่ต้องการแสดง"}
+            {openChartPicker ? "ปิดรายการกราฟ" : "เลือกกราฟที่อยากดู"}
           </Button>
 
           <div className="relative" ref={exportMenuRef}>
-            <Button onClick={() => setOpenExportMenu((v) => !v)}>Export Excel</Button>
+            <Button onClick={() => setOpenExportMenu((v) => !v)}>ส่งออก Excel</Button>
             {openExportMenu ? (
               <div className="absolute right-0 mt-2 w-72 bg-white border rounded-2xl shadow-lg z-50 overflow-hidden">
                 <button
@@ -761,7 +760,7 @@ export default function Dashboard() {
                   }}
                   disabled={exportBusy}
                 >
-                  📌 ส่งออกข้อมูลของฉัน (Excel)
+                  📌 ส่งออกข้อมูลแปลงผักบุ้ง (Excel)
                   <div className="text-xs text-gray-500 mt-1">
                     เลือกหมวดข้อมูลได้ {selectedDate ? ` (เฉพาะวันที่ ${selectedDate})` : ""}
                   </div>
@@ -776,10 +775,10 @@ export default function Dashboard() {
 
           {/* ✅ user ควบคุมปั๊มได้ (ถ้าอยากจำกัดสิทธิ ให้คอมเมนต์ 2 ปุ่มนี้ออก) */}
           <Button onClick={() => sendPump("ON")} disabled={pumpBusy}>
-            {pumpBusy ? "กำลังส่ง..." : "เปิดปั๊ม"}
+            {pumpBusy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
           </Button>
           <Button variant="danger" onClick={() => sendPump("OFF")} disabled={pumpBusy}>
-            {pumpBusy ? "กำลังส่ง..." : "ปิดปั๊ม"}
+            {pumpBusy ? "กำลังส่ง..." : "หยุดรดน้ำ"}
           </Button>
         </div>
       </div>
@@ -788,8 +787,8 @@ export default function Dashboard() {
         <Card className="p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="text-lg font-bold text-gray-900">เลือกกราฟที่ต้องการแสดง</div>
-              <div className="text-sm text-gray-500">กดเพื่อเปิด/ปิดกราฟ (ระบบจำการเลือกไว้ให้)</div>
+              <div className="text-lg font-bold text-gray-900">เลือกกราฟที่อยากดู</div>
+              <div className="text-sm text-gray-500">กดเพื่อเปิด/ปิดกราฟ ระบบจะจำไว้ให้</div>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -916,24 +915,24 @@ export default function Dashboard() {
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-8">
-            <SummaryCard title={<>อุณหภูมิ<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(latestShow?.temperature, 1)} status={statusTemp(latestShow?.temperature)} />
+            <SummaryCard title={<>อุณหภูมิอากาศ<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(latestShow?.temperature, 1)} status={statusTemp(latestShow?.temperature)} />
             <SummaryCard title={<>ความชื้นอากาศ<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.humidity_air, 0)} status={statusRH(latestShow?.humidity_air)} />
             <SummaryCard title={<>ความชื้นดิน<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.soil_moisture, 0)} status={statusSoil(latestShow?.soil_moisture)} />
-            <SummaryCard title={<>แสง<div className="text-xs text-gray-500 mt-1">- lux</div></>} value={fmt(lightLuxValue(latestShow), 0)} status={statusLightLux(lightLuxValue(latestShow))} />
+            <SummaryCard title={<>แสงที่พืชได้รับ<div className="text-xs text-gray-500 mt-1">- lux</div></>} value={fmt(lightLuxValue(latestShow), 0)} status={statusLightLux(lightLuxValue(latestShow))} />
 
-            <SummaryCard title={<>VPD<div className="text-xs text-gray-500 mt-1">- kPa</div></>} value={fmt(indexLatestShow?.vpd, 2)} status={statusVPD(indexLatestShow?.vpd)} />
-            <SummaryCard title={<>GDD<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(indexLatestShow?.gdd, 2)} status={statusGDD(indexLatestShow?.gdd)} />
+            <SummaryCard title={<>ความแห้งของอากาศ (VPD)<div className="text-xs text-gray-500 mt-1">- kPa</div></>} value={fmt(indexLatestShow?.vpd, 2)} status={statusVPD(indexLatestShow?.vpd)} />
+            <SummaryCard title={<>ความร้อนสะสม (GDD)<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(indexLatestShow?.gdd, 2)} status={statusGDD(indexLatestShow?.gdd)} />
             <SummaryCard title={<>จุดน้ำค้าง<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(indexLatestShow?.dew_point, 1)} status={statusDewPoint(latestShow?.temperature, indexLatestShow?.dew_point)} />
-            <SummaryCard title={<>อัตราดินแห้ง<div className="text-xs text-gray-500 mt-1">- %/min</div></>} value={fmt(indexLatestShow?.soil_drying_rate, 3)} status={statusSoilDryingRate(indexLatestShow?.soil_drying_rate)} />
+            <SummaryCard title={<>ความเร็วที่ดินแห้ง<div className="text-xs text-gray-500 mt-1">- %/min</div></>} value={fmt(indexLatestShow?.soil_drying_rate, 3)} status={statusSoilDryingRate(indexLatestShow?.soil_drying_rate)} />
           </div>
 
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-lg font-semibold text-gray-900">Smart Summary</div>
-                <div className="text-sm text-gray-500">สรุป + คำแนะนำจาก VPD / Dew Point / Soil Drying</div>
+                <div className="text-lg font-semibold text-gray-900">สรุปสำหรับผักบุ้ง</div>
+                <div className="text-sm text-gray-500">สรุปสภาพแวดล้อมแบบเข้าใจง่าย</div>
               </div>
-              <Badge variant="blue">Insight</Badge>
+              <Badge variant="blue">คำแนะนำ</Badge>
             </div>
 
             {!latestShow || !indexLatestShow ? (
@@ -964,7 +963,7 @@ export default function Dashboard() {
             {visibleCharts.length === 0 ? (
               <Card className="p-6 lg:col-span-2">
                 <div className="text-sm text-gray-600">
-                  ยังไม่ได้เลือกกราฟที่ต้องการแสดง (กด “เลือกกราฟที่ต้องการแสดง” ด้านบน)
+                  ยังไม่ได้เลือกกราฟที่อยากดู (กด “เลือกกราฟที่อยากดู” ด้านบน)
                 </div>
               </Card>
             ) : (
@@ -984,26 +983,26 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="p-5">
               <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">ค่าตั้งค่าฟาร์ม</div>
-                <Badge variant="gray">Settings</Badge>
+                <div className="text-lg font-semibold text-gray-900">ค่าตั้งระบบรดน้ำ</div>
+                <Badge variant="gray">ตั้งค่า</Badge>
               </div>
 
               {!settings ? (
                 <div className="mt-3 text-sm text-gray-500">
-                  ยังไม่มีการตั้งค่า หรือดึง Settings ไม่สำเร็จ (แต่ Dashboard ยังใช้งานได้)
+                  ยังไม่มีการตั้งค่า หรือดึงข้อมูลไม่สำเร็จ (แต่หน้านี้ยังใช้งานได้)
                 </div>
               ) : (
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="text-gray-500">Temp Threshold</div>
+                  <div className="text-gray-500">เตือนเมื่ออุณหภูมิสูงกว่า</div>
                   <div className="font-medium">{tempTh ?? "-"} °C</div>
 
-                  <div className="text-gray-500">RH Threshold</div>
+                  <div className="text-gray-500">เตือนเมื่อความชื้นอากาศสูงกว่า</div>
                   <div className="font-medium">{rhTh ?? "-"} %</div>
 
-                  <div className="text-gray-500">Soil Threshold</div>
+                  <div className="text-gray-500">เตือนเมื่อดินแห้งต่ำกว่า</div>
                   <div className="font-medium">{soilTh ?? "-"} %</div>
 
-                  <div className="text-gray-500">Sampling Interval</div>
+                  <div className="text-gray-500">ช่วงเวลาวัดค่า</div>
                   <div className="font-medium">{samplingMin ?? "-"} นาที</div>
                 </div>
               )}
@@ -1012,7 +1011,7 @@ export default function Dashboard() {
             <Card className="p-5">
               <div className="flex items-center justify-between">
                 <div className="text-lg font-semibold text-gray-900">การแจ้งเตือนล่าสุด</div>
-                <Badge variant="blue">Notifications</Badge>
+                <Badge variant="blue">แจ้งเตือน</Badge>
               </div>
 
               {notifs.length === 0 ? (
@@ -1038,9 +1037,9 @@ export default function Dashboard() {
 
           {!latestShow && filteredSensorHistory.length === 0 && (
             <Card className="p-5 bg-emerald-50 border-emerald-200">
-              <div className="font-semibold text-emerald-900">ยังไม่มีข้อมูล Sensor ใน MongoDB</div>
+              <div className="font-semibold text-emerald-900">ยังไม่มีข้อมูลจากเซนเซอร์</div>
               <div className="text-sm text-emerald-800 mt-1">
-                ถ้า ESP32 ส่งข้อมูลเข้ามาแล้ว หน้านี้จะอัปเดตเองทุก 5 วินาที
+                เมื่ออุปกรณ์ส่งข้อมูลเข้ามา หน้านี้จะอัปเดตเองทุก 5 วินาที
               </div>
             </Card>
           )}

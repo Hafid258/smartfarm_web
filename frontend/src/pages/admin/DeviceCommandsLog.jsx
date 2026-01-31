@@ -36,6 +36,9 @@ export default function DeviceCommandsLog() {
   const [duration, setDuration] = useState(10);
   const [logs, setLogs] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
+  const [settings, setSettings] = useState(null);
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [pauseBusy, setPauseBusy] = useState(false);
 
   async function loadFarms() {
     const res = await api.get("/farms");
@@ -52,8 +55,12 @@ export default function DeviceCommandsLog() {
     setErr("");
     try {
       setLoadingLog(true);
-      const res = await api.get(`/device/commands?limit=30`);
-      setLogs(Array.isArray(res.data) ? res.data : []);
+      const [logRes, settingRes] = await Promise.all([
+        api.get(`/device/commands?limit=30`),
+        api.get(`/settings/my?farm_id=${encodeURIComponent(farmId)}`),
+      ]);
+      setLogs(Array.isArray(logRes.data) ? logRes.data : []);
+      setSettings(settingRes.data || null);
     } catch (e) {
       setErr(e.message || "โหลดประวัติคำสั่งไม่สำเร็จ");
     } finally {
@@ -103,7 +110,8 @@ export default function DeviceCommandsLog() {
         command,
         duration_sec: Number(duration) || undefined,
       });
-      toast.success(`ส่งคำสั่งปั๊ม: ${command} สำเร็จ`);
+      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
+      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
       await loadLogs();
     } catch (e) {
       toast.error(e.message || "ส่งคำสั่งไม่สำเร็จ");
@@ -112,12 +120,68 @@ export default function DeviceCommandsLog() {
     }
   }
 
+  async function toggleAutoSoil() {
+    try {
+      if (!settings) return;
+      setAutoBusy(true);
+      const next = !settings.auto_soil_enabled;
+      await api.post(`/settings/my?farm_id=${encodeURIComponent(farmId)}`, {
+        ...settings,
+        auto_soil_enabled: next,
+      });
+      toast.success(next ? "เปิดระบบรดน้ำตามความชื้นแล้ว" : "ปิดระบบรดน้ำตามความชื้นแล้ว");
+      await loadLogs();
+    } catch (e) {
+      toast.error(e.message || "อัปเดตไม่สำเร็จ");
+    } finally {
+      setAutoBusy(false);
+    }
+  }
+
+  async function pausePump() {
+    try {
+      setPauseBusy(true);
+      await api.post("/device/command", { command: "PAUSE" });
+      if (settings) {
+        await api.post(`/settings/my?farm_id=${encodeURIComponent(farmId)}`, {
+          ...settings,
+          pump_paused: true,
+        });
+      }
+      toast.success("พักปั๊มชั่วคราวแล้ว");
+      await loadLogs();
+    } catch (e) {
+      toast.error(e.message || "พักปั๊มไม่สำเร็จ");
+    } finally {
+      setPauseBusy(false);
+    }
+  }
+
+  async function resumePump() {
+    try {
+      setPauseBusy(true);
+      await api.post("/device/command", { command: "RESUME" });
+      if (settings) {
+        await api.post(`/settings/my?farm_id=${encodeURIComponent(farmId)}`, {
+          ...settings,
+          pump_paused: false,
+        });
+      }
+      toast.success("สั่งปั๊มทำงานต่อแล้ว");
+      await loadLogs();
+    } catch (e) {
+      toast.error(e.message || "สั่งต่อไม่สำเร็จ");
+    } finally {
+      setPauseBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">ควบคุมปั๊มน้ำ</div>
-          <div className="text-sm text-gray-500">สั่งงานปั๊ม + ดูประวัติการให้น้ำ</div>
+          <div className="text-2xl font-bold text-gray-900">ควบคุมการรดน้ำ</div>
+          <div className="text-sm text-gray-500">สั่งงานปั๊มและดูประวัติการรดน้ำของฟาร์ม</div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -126,7 +190,7 @@ export default function DeviceCommandsLog() {
             value={farmId}
             onChange={(e) => setFarmId(e.target.value)}
           >
-            {farms.length === 0 ? <option value="">No farms</option> : farms.map((f) => (
+            {farms.length === 0 ? <option value="">ไม่มีฟาร์ม</option> : farms.map((f) => (
               <option key={f._id} value={f._id}>{f.farm_name}</option>
             ))}
           </select>
@@ -139,14 +203,14 @@ export default function DeviceCommandsLog() {
       <Card className="p-5">
         <div className="flex flex-col lg:flex-row gap-5 lg:items-end lg:justify-between">
           <div className="flex-1">
-            <div className="text-lg font-semibold text-gray-900">ส่งคำสั่ง</div>
+            <div className="text-lg font-semibold text-gray-900">สั่งปั๊มรดน้ำ</div>
             <div className="text-sm text-gray-500 mt-1">
-              ระบบจะบันทึกคำสั่งไว้ในฐานข้อมูล (ยังไม่ต้องมีเซนเซอร์จริง)
+              ระบบจะบันทึกคำสั่งไว้เพื่อดูย้อนหลัง
             </div>
 
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <div className="text-sm text-gray-600 mb-1">ระยะเวลา (วินาที)</div>
+                <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที)</div>
                 <Input
                   type="number"
                   min={1}
@@ -160,10 +224,16 @@ export default function DeviceCommandsLog() {
 
               <div className="flex gap-2 sm:justify-end sm:items-end">
                 <Button onClick={() => sendCommand("ON")} disabled={busy || !farmId} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "เปิดปั๊ม"}
+                  {busy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
                 </Button>
                 <Button variant="danger" onClick={() => sendCommand("OFF")} disabled={busy || !farmId} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "ปิดปั๊ม"}
+                  {busy ? "กำลังส่ง..." : "หยุดรดน้ำ"}
+                </Button>
+                <Button variant="outline" onClick={pausePump} disabled={pauseBusy || !farmId} className="w-full sm:w-auto">
+                  {pauseBusy ? "กำลังส่ง..." : "พักระบบรดน้ำ"}
+                </Button>
+                <Button variant="outline" onClick={resumePump} disabled={pauseBusy || !farmId} className="w-full sm:w-auto">
+                  {pauseBusy ? "กำลังส่ง..." : "ทำงานต่อ"}
                 </Button>
               </div>
             </div>
@@ -171,10 +241,10 @@ export default function DeviceCommandsLog() {
 
           <div className="lg:w-[360px]">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="font-semibold text-emerald-900">คำแนะนำ</div>
+              <div className="font-semibold text-emerald-900">คำแนะนำสำหรับผักบุ้ง</div>
               <ul className="mt-2 text-sm text-emerald-800 list-disc pl-5 space-y-1">
-                <li>ปุ่มจะถูกปิดชั่วคราวระหว่างกำลังส่ง เพื่อกันกดซ้ำ</li>
-                <li>ถ้าต้องการ “กัน spam” แนะนำทำ rate-limit ที่ backend</li>
+                <li>ผักบุ้งชอบดินชื้นสม่ำเสมอ แนะนำรดเป็นช่วงสั้น ๆ แต่ต่อเนื่อง</li>
+                <li>หากดินชื้นมากให้เว้นช่วงรดน้ำเพื่อกันน้ำขัง</li>
                 <li>ดูประวัติคำสั่งด้านล่างได้เลย</li>
               </ul>
             </div>
@@ -184,8 +254,19 @@ export default function DeviceCommandsLog() {
 
       <Card className="p-5">
         <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold text-gray-900">ประวัติการให้น้ำ</div>
-          <Badge variant="gray">Watering Logs</Badge>
+          <div className="text-lg font-semibold text-gray-900">ประวัติการรดน้ำ</div>
+          <Badge variant="gray">บันทึกการรดน้ำ</Badge>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2 items-center">
+          <Button variant="outline" onClick={toggleAutoSoil} disabled={autoBusy || !settings}>
+            {autoBusy
+              ? "กำลังอัปเดต..."
+              : settings?.auto_soil_enabled
+                ? "ปิดรดน้ำอัตโนมัติ (ตามความชื้นดิน)"
+                : "เปิดรดน้ำอัตโนมัติ (ตามความชื้นดิน)"}
+          </Button>
+          {settings?.pump_paused ? <Badge variant="yellow">ปั๊มถูกพักชั่วคราว</Badge> : null}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 items-center">
@@ -260,7 +341,7 @@ export default function DeviceCommandsLog() {
                     <td className="py-2 pr-4 text-gray-700">{l.duration_sec ?? "-"}</td>
                     <td className="py-2 pr-4">
                       <Badge variant={l.status === "success" ? "green" : l.status === "fail" ? "red" : "gray"}>
-                        {l.status || "unknown"}
+                        {l.status === "success" ? "สำเร็จ" : l.status === "fail" ? "ไม่สำเร็จ" : "ไม่ทราบสถานะ"}
                       </Badge>
                       {l.error_message ? (
                         <div className="text-xs text-red-600 mt-1">{l.error_message}</div>

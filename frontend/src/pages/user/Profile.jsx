@@ -53,8 +53,8 @@ export default function Profile() {
   async function saveProfile() {
     try {
       if (!username.trim()) return toast.error("กรุณากรอกชื่อผู้ใช้");
-      if (!email.trim()) return toast.error("กรุณากรอก email");
-      if (!email.includes("@")) return toast.error("รูปแบบ email ไม่ถูกต้อง");
+      if (!email.trim()) return toast.error("กรุณากรอกอีเมล");
+      if (!email.includes("@")) return toast.error("รูปแบบอีเมลไม่ถูกต้อง");
 
       setSaving(true);
 
@@ -106,15 +106,15 @@ export default function Profile() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Profile</div>
-          <div className="text-sm text-gray-500">จัดการข้อมูลบัญชีผู้ใช้งาน (email / phone / password)</div>
+          <div className="text-2xl font-bold text-gray-900">บัญชีของฉัน</div>
+          <div className="text-sm text-gray-500">จัดการข้อมูลบัญชี (อีเมล / เบอร์โทร / รหัสผ่าน)</div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadMe} disabled={loading}>
             รีเฟรช
           </Button>
           <Button variant="danger" onClick={logout}>
-            Logout
+            ออกจากระบบ
           </Button>
         </div>
       </div>
@@ -136,7 +136,7 @@ export default function Profile() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold text-gray-900">ข้อมูลบัญชี</div>
-                <div className="text-sm text-gray-500">ระบบดึงข้อมูลจาก API: /api/auth/me</div>
+                <div className="text-sm text-gray-500">ข้อมูลนี้ใช้แสดงสำหรับผู้ดูแลแปลง</div>
               </div>
               <Badge variant={profile.role === "admin" ? "blue" : "gray"}>{profile.role}</Badge>
             </div>
@@ -178,9 +178,9 @@ export default function Profile() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-lg font-semibold text-gray-900">แก้ไขข้อมูลผู้ใช้</div>
-                <div className="text-sm text-gray-500 mt-1">อัปเดตผ่าน API: /api/auth/me</div>
+                <div className="text-sm text-gray-500 mt-1">ใช้สำหรับติดต่อและเข้าระบบ</div>
               </div>
-              <Badge variant="green">editable</Badge>
+              <Badge variant="green">แก้ไขได้</Badge>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -194,7 +194,7 @@ export default function Profile() {
               </div>
 
               <div>
-                <div className="text-sm text-gray-600 mb-1">Email</div>
+                <div className="text-sm text-gray-600 mb-1">อีเมล</div>
                 <Input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -203,7 +203,7 @@ export default function Profile() {
               </div>
 
               <div>
-                <div className="text-sm text-gray-600 mb-1">Phone</div>
+                <div className="text-sm text-gray-600 mb-1">เบอร์โทร</div>
                 <Input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -238,9 +238,9 @@ export default function Profile() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-lg font-semibold text-gray-900">เปลี่ยนรหัสผ่าน</div>
-                <div className="text-sm text-gray-500 mt-1">อัปเดตผ่าน API: /api/auth/change-password</div>
+                <div className="text-sm text-gray-500 mt-1">เพื่อความปลอดภัยของบัญชีคุณ</div>
               </div>
-              <Badge variant="yellow">security</Badge>
+              <Badge variant="yellow">ความปลอดภัย</Badge>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -279,7 +279,7 @@ export default function Profile() {
       {!loading && !profile && (
         <Card className="p-5 border-yellow-200 bg-yellow-50">
           <div className="text-yellow-800 font-semibold">ไม่พบข้อมูลผู้ใช้งาน</div>
-          <div className="text-sm text-yellow-700 mt-1">กรุณา Login ใหม่ หรือเช็ค token</div>
+          <div className="text-sm text-yellow-700 mt-1">กรุณาเข้าสู่ระบบใหม่อีกครั้ง</div>
         </Card>
       )}
     </div>

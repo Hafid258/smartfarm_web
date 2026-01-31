@@ -96,12 +96,22 @@ export default function Notifications() {
     }
   }
 
+  async function quickWater(n) {
+    try {
+      const duration = Number(n.recommended_duration_sec || 30);
+      await api.post("/device/command", { command: "ON", duration_sec: duration });
+      toast.success(`ส่งคำสั่งรดน้ำ ${duration} วิ สำเร็จ`);
+    } catch (e) {
+      toast.error(e.message || "ส่งคำสั่งไม่สำเร็จ");
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Notifications</div>
-          <div className="text-sm text-gray-500">รายการแจ้งเตือนจากระบบ (MongoDB)</div>
+          <div className="text-2xl font-bold text-gray-900">การแจ้งเตือน</div>
+          <div className="text-sm text-gray-500">ข้อความแจ้งเตือนเกี่ยวกับแปลงผักบุ้ง</div>
         </div>
         <Button variant="outline" onClick={load} disabled={loading}>
           รีเฟรช
@@ -112,7 +122,7 @@ export default function Notifications() {
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
           <div className="flex-1">
             <Input
-              placeholder="ค้นหา (เช่น TEMP, soil, high...)"
+              placeholder="ค้นหา (เช่น อุณหภูมิ, ดิน, สูง...)"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -153,7 +163,7 @@ export default function Notifications() {
                 onlyUnread ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-white border-gray-300 text-gray-700"
               }`}
             >
-              {onlyUnread ? "แสดงเฉพาะยังไม่อ่าน" : "แสดงทั้งหมด"}
+              {onlyUnread ? "แสดงเฉพาะที่ยังไม่อ่าน" : "แสดงทั้งหมด"}
             </button>
             <Badge variant="gray">{filtered.length} รายการ</Badge>
           </div>
@@ -186,6 +196,8 @@ export default function Notifications() {
               const sev = n.severity || "low";
               const sevBadge =
                 sev === "high" ? "red" : sev === "medium" ? "yellow" : sev === "low" ? "gray" : "blue";
+              const sevText =
+                sev === "high" ? "สูง" : sev === "medium" ? "กลาง" : sev === "low" ? "ต่ำ" : "ทั่วไป";
 
               return (
                 <div
@@ -197,9 +209,9 @@ export default function Notifications() {
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-semibold text-gray-900">{n.alert_type || "Notification"}</div>
-                        <Badge variant={sevBadge}>{sev}</Badge>
-                        {!n.is_read ? <Badge variant="green">NEW</Badge> : <Badge variant="gray">read</Badge>}
+                        <div className="font-semibold text-gray-900">{n.alert_type || "แจ้งเตือน"}</div>
+                        <Badge variant={sevBadge}>{sevText}</Badge>
+                        {!n.is_read ? <Badge variant="green">ใหม่</Badge> : <Badge variant="gray">อ่านแล้ว</Badge>}
                       </div>
                       <div className="text-sm text-gray-700 mt-2 break-words">
                         {n.details || "-"}
@@ -210,6 +222,11 @@ export default function Notifications() {
                     </div>
 
                     <div className="shrink-0 flex gap-2">
+                      {n.recommended_action === "water" ? (
+                        <Button variant="outline" onClick={() => quickWater(n)}>
+                          รดน้ำ {n.recommended_duration_sec || 30} วิ
+                        </Button>
+                      ) : null}
                       {!n.is_read && (
                         <Button variant="outline" onClick={() => markRead(n._id)}>
                           อ่านแล้ว

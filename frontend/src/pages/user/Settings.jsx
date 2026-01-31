@@ -56,6 +56,9 @@ export default function Settings() {
     watering_duration_sec: 10,
     watering_cooldown_min: 10,
     watering_schedules: [],
+    auto_soil_enabled: false,
+    auto_soil_start_at: 35,
+    auto_soil_stop_at: 50,
   });
 
   async function load() {
@@ -70,6 +73,9 @@ export default function Settings() {
           watering_duration_sec: s.watering_duration_sec ?? 10,
           watering_cooldown_min: s.watering_cooldown_min ?? 10,
           watering_schedules: normalizeSchedules(s),
+          auto_soil_enabled: Boolean(s.auto_soil_enabled),
+          auto_soil_start_at: s.auto_soil_start_at ?? 35,
+          auto_soil_stop_at: s.auto_soil_stop_at ?? 50,
         });
       }
     } catch (e) {
@@ -135,6 +141,9 @@ export default function Settings() {
         watering_duration_sec: clampNum(form.watering_duration_sec, 1, 3600, 10),
         watering_cooldown_min: clampNum(form.watering_cooldown_min, 0, 1440, 10),
         watering_schedules: form.watering_schedules,
+        auto_soil_enabled: Boolean(form.auto_soil_enabled),
+        auto_soil_start_at: clampNum(form.auto_soil_start_at, 1, 100, 35),
+        auto_soil_stop_at: clampNum(form.auto_soil_stop_at, 1, 100, 50),
       };
 
       await api.post("/settings/my", payload); // ไม่ส่ง farm_id
@@ -152,8 +161,8 @@ export default function Settings() {
     <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Settings</div>
-          <div className="text-sm text-gray-500">Automation และตั้งเวลารดน้ำอัตโนมัติ</div>
+          <div className="text-2xl font-bold text-gray-900">ตั้งค่าระบบ</div>
+          <div className="text-sm text-gray-500">ตั้งเวลารดน้ำและระบบช่วยดูแลผักบุ้ง</div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={load} disabled={loading || saving}>
@@ -183,13 +192,24 @@ export default function Settings() {
           <div className="space-y-5">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">Automation</div>
-                <Badge variant="blue">Automation</Badge>
+                <div className="text-lg font-semibold text-gray-900">ระบบอัตโนมัติ</div>
+                <Badge variant="blue">อัตโนมัติ</Badge>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="lg:col-span-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.auto_soil_enabled)}
+                      onChange={(e) => update("auto_soil_enabled", e.target.checked)}
+                    />
+                    เปิดระบบรดน้ำตามความชื้นดิน (เหมาะกับผักบุ้งที่ชอบดินชื้น)
+                  </label>
+                </div>
+
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Sampling Interval (นาที) — 1 ถึง 1440</div>
+                  <div className="text-sm text-gray-600 mb-1">ช่วงเวลาวัดค่า (นาที) — 1 ถึง 1440</div>
                   <Input
                     type="number"
                     value={form.sampling_interval_min}
@@ -198,7 +218,7 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Watering Duration (วินาที) — 1 ถึง 3600</div>
+                  <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที) — 1 ถึง 3600</div>
                   <Input
                     type="number"
                     value={form.watering_duration_sec}
@@ -207,11 +227,29 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Watering Cooldown (นาที) — 0 ถึง 1440</div>
+                  <div className="text-sm text-gray-600 mb-1">พักก่อนรดน้ำรอบถัดไป (นาที) — 0 ถึง 1440</div>
                   <Input
                     type="number"
                     value={form.watering_cooldown_min}
                     onChange={(e) => update("watering_cooldown_min", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">เริ่มรดเมื่อความชื้นดินต่ำกว่า (%)</div>
+                  <Input
+                    type="number"
+                    value={form.auto_soil_start_at}
+                    onChange={(e) => update("auto_soil_start_at", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">หยุดรดเมื่อความชื้นดินถึง (%)</div>
+                  <Input
+                    type="number"
+                    value={form.auto_soil_stop_at}
+                    onChange={(e) => update("auto_soil_stop_at", e.target.value)}
                   />
                 </div>
               </div>
@@ -245,11 +283,11 @@ export default function Settings() {
                         </Button>
                       </div>
 
-                      <div>
-                        <div className="text-sm text-gray-600 mb-1">เวลา (HH:mm)</div>
-                        <Input
-                          type="time"
-                          value={s.time || "06:00"}
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">เวลา (HH:mm)</div>
+                          <Input
+                            type="time"
+                            value={s.time || "06:00"}
                           onChange={(e) => updateSchedule(idx, { time: e.target.value })}
                         />
                       </div>

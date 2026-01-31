@@ -33,6 +33,14 @@ const schema = new mongoose.Schema(
     watering_duration_sec: { type: Number, default: 30 },
     watering_cooldown_min: { type: Number, default: 10 },
 
+    // soil auto (from UI)
+    auto_soil_enabled: { type: Boolean, default: false },
+    auto_soil_start_at: { type: Number, default: 35 },
+    auto_soil_stop_at: { type: Number, default: 50 },
+
+    // pause all watering (เริ่มต้นให้หยุดไว้ก่อน)
+    pump_paused: { type: Boolean, default: true },
+
     // schedule (legacy)
     watering_schedule_enabled: { type: Boolean, default: false },
     watering_schedule_time: { type: String, default: "06:00" },

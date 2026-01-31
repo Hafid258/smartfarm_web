@@ -39,9 +39,9 @@ function analyzeDevice(device, onlineSeconds = 60) {
 
   if (!online) {
     if (diffSec === null) {
-      issues.push("ยังไม่เคยส่งสถานะเข้าระบบ (ไม่มี last_seen)");
+      issues.push("ยังไม่เคยส่งสถานะเข้าระบบ");
     } else {
-      issues.push(`ขาดการติดต่อมาแล้ว ${diffSec} วินาที (เกิน ${onlineSeconds}s)`);
+      issues.push(`ขาดการติดต่อมาแล้ว ${diffSec} วินาที (เกิน ${onlineSeconds} วินาที)`);
     }
   }
 
@@ -65,7 +65,7 @@ function analyzeDevice(device, onlineSeconds = 60) {
   return {
     issues,
     status,
-    connectionText: online ? "เชื่อมต่อสำเร็จ" : "ไม่สำเร็จ",
+    connectionText: online ? "ออนไลน์" : "ออฟไลน์",
     diffSec,
     online,
     wifi,
@@ -180,7 +180,8 @@ export default function DeviceStatus() {
         command,
         device_id: deviceId,
       });
-      toast.success(`ส่งคำสั่งปั๊ม: ${command} สำเร็จ`);
+      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
+      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
     } catch (e) {
       toast.error(e?.response?.data?.error || e.message || "ส่งคำสั่งไม่สำเร็จ");
     } finally {
@@ -194,7 +195,7 @@ export default function DeviceStatus() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-2xl font-bold text-gray-900">สถานะอุปกรณ์</div>
-          <div className="text-sm text-gray-500">ตรวจสอบการเชื่อมต่ออุปกรณ์ในฟาร์มของคุณ</div>
+          <div className="text-sm text-gray-500">ตรวจสอบอุปกรณ์ในแปลงผักบุ้งของคุณ</div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -258,8 +259,8 @@ export default function DeviceStatus() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
-                    Last seen: {fmtTime(d.last_seen_at)}{" "}
-                    {d.diffSec !== null ? `(ห่าง ${d.diffSec}s)` : ""}
+                    ล่าสุด: {fmtTime(d.last_seen_at)}{" "}
+                    {d.diffSec !== null ? `(ห่าง ${d.diffSec} วินาที)` : ""}
                   </div>
                 </div>
 
@@ -278,7 +279,7 @@ export default function DeviceStatus() {
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Pump</span>
+                  <span className="text-gray-600">ปั๊มน้ำ</span>
                   <span className="font-semibold">
                     {d.pump_state === "ON" ? "เปิด" : "ปิด"}
                   </span>
@@ -296,7 +297,7 @@ export default function DeviceStatus() {
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Soil Sensor</span>
+                  <span className="text-gray-600">เซนเซอร์ดิน</span>
                   <span
                     className={`font-semibold ${
                       d.soil_ok ? "text-emerald-700" : "text-red-700"
@@ -307,7 +308,7 @@ export default function DeviceStatus() {
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Light</span>
+                  <span className="text-gray-600">แสง</span>
                   <span
                     className={`font-semibold ${
                       d.light_ok === false
@@ -322,7 +323,7 @@ export default function DeviceStatus() {
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Firmware</span>
+                  <span className="text-gray-600">เฟิร์มแวร์</span>
                   <span className="font-semibold">{d.fw_version || "-"}</span>
                 </div>
               </div>

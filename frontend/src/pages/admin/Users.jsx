@@ -102,8 +102,8 @@ export default function Users() {
   async function submit() {
     setErr("");
 
-    if (!form.username.trim()) return toast.error("กรุณากรอก username");
-    if (!form.email.trim()) return toast.error("กรุณากรอก email");
+    if (!form.username.trim()) return toast.error("กรุณากรอกชื่อผู้ใช้");
+    if (!form.email.trim()) return toast.error("กรุณากรอกอีเมล");
 
     // ✅ ถ้า farms มีข้อมูล แต่ยังไม่เลือกฟาร์ม ให้เตือน
     // (ถ้าคุณอยาก allow user ที่ไม่มีฟาร์ม ให้คอมเมนต์บรรทัดนี้ได้)
@@ -161,8 +161,8 @@ export default function Users() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Users</div>
-          <div className="text-sm text-gray-500">จัดการบัญชีผู้ใช้</div>
+          <div className="text-2xl font-bold text-gray-900">ผู้ใช้งาน</div>
+          <div className="text-sm text-gray-500">จัดการบัญชีผู้ดูแลและผู้ใช้งาน</div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={load} disabled={loading}>
@@ -177,17 +177,17 @@ export default function Users() {
       <Card className="p-5">
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
           <div className="flex-1">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา username/email/role/farm..." />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่อผู้ใช้/อีเมล/สิทธิ์/ฟาร์ม..." />
           </div>
-          <Badge variant="gray">{filtered.length} users</Badge>
+          <Badge variant="gray">{filtered.length} คน</Badge>
         </div>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <div className="text-lg font-semibold text-gray-900">รายการผู้ใช้</div>
-            {loading ? <Badge variant="gray">loading</Badge> : <Badge variant="blue">list</Badge>}
+            <div className="text-lg font-semibold text-gray-900">รายการผู้ใช้งาน</div>
+            {loading ? <Badge variant="gray">กำลังโหลด</Badge> : <Badge variant="blue">รายการ</Badge>}
           </div>
 
           {loading && (
@@ -210,12 +210,12 @@ export default function Users() {
               <table className="min-w-full text-sm">
                 <thead className="text-left text-gray-500">
                   <tr className="border-b">
-                    <th className="py-2 pr-4">Username</th>
-                    <th className="py-2 pr-4">Email</th>
-                    <th className="py-2 pr-4">Role</th>
-                    <th className="py-2 pr-4">Farm</th>
-                    <th className="py-2 pr-4">Active</th>
-                    <th className="py-2 pr-4">Action</th>
+                    <th className="py-2 pr-4">ชื่อผู้ใช้</th>
+                    <th className="py-2 pr-4">อีเมล</th>
+                    <th className="py-2 pr-4">สิทธิ์</th>
+                    <th className="py-2 pr-4">ฟาร์ม</th>
+                    <th className="py-2 pr-4">สถานะ</th>
+                    <th className="py-2 pr-4">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,15 +228,15 @@ export default function Users() {
                       </td>
                       <td className="py-2 pr-4 text-gray-700">{u.farm_id?.farm_name || "-"}</td>
                       <td className="py-2 pr-4">
-                        <Badge variant={u.is_active ? "green" : "red"}>{u.is_active ? "yes" : "no"}</Badge>
+                        <Badge variant={u.is_active ? "green" : "red"}>{u.is_active ? "ใช้งาน" : "ปิดใช้งาน"}</Badge>
                       </td>
                       <td className="py-2 pr-4">
                         <div className="flex gap-2">
                           <Button variant="outline" onClick={() => startEdit(u)}>
-                            Edit
+                            แก้ไข
                           </Button>
                           <Button variant="danger" onClick={() => remove(u._id)}>
-                            Delete
+                            ลบ
                           </Button>
                         </div>
                       </td>
@@ -253,28 +253,28 @@ export default function Users() {
             <div className="text-lg font-semibold text-gray-900">
               {mode === "create" ? "สร้างผู้ใช้" : "แก้ไขผู้ใช้"}
             </div>
-            <Badge variant={mode === "create" ? "green" : "yellow"}>{mode}</Badge>
+            <Badge variant={mode === "create" ? "green" : "yellow"}>{mode === "create" ? "สร้างใหม่" : "แก้ไข"}</Badge>
           </div>
 
           <div className="mt-4 space-y-3">
             <div>
-              <div className="text-sm text-gray-600 mb-1">Username</div>
+              <div className="text-sm text-gray-600 mb-1">ชื่อผู้ใช้</div>
               <Input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
             </div>
 
             <div>
-              <div className="text-sm text-gray-600 mb-1">Email</div>
+              <div className="text-sm text-gray-600 mb-1">อีเมล</div>
               <Input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
             </div>
 
             <div>
-              <div className="text-sm text-gray-600 mb-1">Phone</div>
+              <div className="text-sm text-gray-600 mb-1">เบอร์โทร</div>
               <Input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-sm text-gray-600 mb-1">Role</div>
+                <div className="text-sm text-gray-600 mb-1">สิทธิ์</div>
                 <select
                   className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
                   value={form.role}
@@ -286,7 +286,7 @@ export default function Users() {
               </div>
 
               <div>
-                <div className="text-sm text-gray-600 mb-1">Farm</div>
+                <div className="text-sm text-gray-600 mb-1">ฟาร์ม</div>
                 <select
                   className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
                   value={form.farm_id}
@@ -310,13 +310,13 @@ export default function Users() {
                 onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))}
               />
               <label htmlFor="is_active" className="text-sm text-gray-700">
-                Active
+                เปิดใช้งาน
               </label>
             </div>
 
             <div>
               <div className="text-sm text-gray-600 mb-1">
-                Password {mode === "edit" ? "(ใส่เพื่อ reset)" : "(ถ้าไม่ใส่ backend จะตั้ง default 123456)"}
+                รหัสผ่าน {mode === "edit" ? "(ใส่เพื่อรีเซ็ต)" : "(ถ้าไม่ใส่ ระบบจะตั้งค่าเริ่มต้น 123456)"}
               </div>
               <Input
                 type="password"

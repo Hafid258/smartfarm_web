@@ -7,17 +7,15 @@ function cx(...a) {
 }
 
 const links = [
-  { to: "/admin/dashboard", label: "Dashboard" },
-  { to: "/admin/users", label: "Users" },
-  { to: "/admin/farms", label: "Farms" },
-  { to: "/admin/plants", label: "Plants" },
-  { to: "/admin/settings", label: "Farm Settings" },
-  { to: "/admin/notifications", label: "Notifications" },
-  { to: "/admin/commands", label: "Commands Log" },
-  { to: "/admin/device-status", label: "Device Status" },
-  { to: "/admin/alert-rules", label: "ตั้งค่าการแจ้งเตือน" },
-
-
+  { to: "/admin/dashboard", label: "ภาพรวมระบบ" },
+  { to: "/admin/users", label: "ผู้ใช้งาน" },
+  { to: "/admin/farms", label: "ฟาร์ม" },
+  { to: "/admin/plants", label: "พืช/แปลง" },
+  { to: "/admin/settings", label: "ตั้งค่าฟาร์ม" },
+  { to: "/admin/notifications", label: "การแจ้งเตือน" },
+  { to: "/admin/commands", label: "ประวัติคำสั่ง" },
+  { to: "/admin/device-status", label: "สถานะอุปกรณ์" },
+  { to: "/admin/alert-rules", label: "กฎการแจ้งเตือน" },
 ];
 
 export default function AdminLayout() {
@@ -37,11 +35,11 @@ export default function AdminLayout() {
             <div className="h-9 w-9 rounded-2xl bg-gray-900" />
             <div>
               <div className="font-bold text-gray-900 leading-tight">SmartFarm</div>
-              <div className="text-xs text-gray-500">Admin Console</div>
+              <div className="text-xs text-gray-500">โหมดผู้ดูแลระบบ</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={logout}>Logout</Button>
+            <Button variant="outline" onClick={logout}>ออกจากระบบ</Button>
           </div>
         </div>
       </div>
@@ -50,7 +48,7 @@ export default function AdminLayout() {
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-[72px] h-fit">
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="text-xs font-semibold text-gray-500 mb-3">ADMIN MENU</div>
+            <div className="text-xs font-semibold text-gray-500 mb-3">เมนูผู้ดูแล</div>
             <nav className="space-y-1">
               {links.map((l) => (
                 <NavLink
@@ -71,9 +69,9 @@ export default function AdminLayout() {
             </nav>
 
             <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <div className="text-sm font-semibold text-gray-900">Reminder</div>
+              <div className="text-sm font-semibold text-gray-900">หมายเหตุ</div>
               <div className="text-sm text-gray-700 mt-1">
-                Admin สามารถเลือกฟาร์มจากหน้าแต่ละเมนูได้ (ถ้า backend อนุญาต override farm)
+                ผู้ดูแลสามารถเลือกฟาร์มจากแต่ละหน้าได้ หากระบบหลังบ้านเปิดสิทธิให้เปลี่ยนฟาร์ม
               </div>
             </div>
           </div>

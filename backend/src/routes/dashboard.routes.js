@@ -265,7 +265,6 @@ router.post("/index/generate", async (req, res) => {
   }
 });
 
-export default router;
 /**
  * ✅ GET /api/dashboard/available-months
  * months that have data (sensor/index/notifications)
@@ -290,3 +289,5 @@ router.get("/available-months", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch available months" });
   }
 });
+
+export default router;

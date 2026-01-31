@@ -21,17 +21,19 @@
 const char* WIFI_SSID = "Gggg";
 const char* WIFI_PASS = "12345678";
 
-// ------------------ API (ngrok) ------------------
-const char* API_BASE   = "https://thermostable-bankerly-angelia.ngrok-free.dev/api";
-const char* FARM_ID    = "694f46c2707b1b7026839ae2";
-const char* DEVICE_KEY = "123456789";
+// ------------------ API (fixed) ------------------
+// NOTE: CONFIG_URL is unused unless you return JSON with { api_base: "..." }
+const char* CONFIG_URL = "";
+String apiBase = "https://smartfarm-backend-i46a.vercel.app/api";
+const char* FARM_ID    = "697b7012a25c6b8336c8f51e";
+const char* DEVICE_KEY = "16c86635e188436366e9cfd4";
 
 // Endpoints
-String EP_SENSOR = String(API_BASE) + "/device/sensor";
-String EP_STATUS = String(API_BASE) + "/device-status/status?farm_id=" + String(FARM_ID);
-String EP_POLL   = String(API_BASE) + "/device/commands/poll?farm_id=" + String(FARM_ID) + "&device_key=" + String(DEVICE_KEY);
-String EP_ACK    = String(API_BASE) + "/device/commands/ack";
-String EP_HEALTH = String(API_BASE) + "/health";
+String EP_SENSOR;
+String EP_STATUS;
+String EP_POLL;
+String EP_ACK;
+String EP_HEALTH;
 
 // ------------------ Pins ------------------
 #define DHTPIN 4
@@ -41,7 +43,7 @@ const int PIN_SOIL_ADC  = 34;
 
 const int RELAY1_PIN = 26; // pump
 const int RELAY2_PIN = 27; // spare
-const bool RELAY_ACTIVE_LOW = true; // ถ้ารีเลย์ทำงานกลับด้าน ให้สลับค่า
+const bool RELAY_ACTIVE_LOW = false; // ถ้ารีเลย์ทำงานกลับด้าน ให้สลับค่า
 
 // ------------------ BH1750 (I2C) ------------------
 BH1750 lightMeter;
@@ -68,23 +70,78 @@ unsigned long lastHealthMs = 0;
 
 const unsigned long SENSOR_INTERVAL_MS = 60UL * 1000UL;
 const unsigned long STATUS_INTERVAL_MS = 30UL * 1000UL;
-const unsigned long POLL_INTERVAL_MS   = 5UL  * 1000UL;
-const unsigned long HEALTH_INTERVAL_MS = 10UL * 1000UL;
+const unsigned long POLL_INTERVAL_MS   = 12UL * 1000UL;
+// ปิดการเรียก /health เพื่อลดโอกาส connection refused จาก ngrok
+const unsigned long HEALTH_INTERVAL_MS = 24UL * 60UL * 60UL * 1000UL; // 24 ชั่วโมง
+
+// ------------------ Network backoff (กันยิงถี่ตอนปลายทางล่ม) ------------------
+unsigned long nextNetAllowedMs = 0;
+unsigned long netBackoffMs = 0;
+const unsigned long NET_BACKOFF_BASE_MS = 3000UL;
+const unsigned long NET_BACKOFF_MAX_MS  = 30000UL;
+
+bool netAllowed() {
+  return millis() >= nextNetAllowedMs;
+}
+
+void noteNetSuccess() {
+  netBackoffMs = 0;
+  nextNetAllowedMs = 0;
+}
+
+void noteNetFailure() {
+  if (netBackoffMs == 0) netBackoffMs = NET_BACKOFF_BASE_MS;
+  else netBackoffMs = (unsigned long)min((uint32_t)NET_BACKOFF_MAX_MS, (uint32_t)(netBackoffMs * 2UL));
+
+  nextNetAllowedMs = millis() + netBackoffMs;
+  Serial.printf("[NET] backoff %lu ms\n", netBackoffMs);
+}
 
 // Pump runtime
 bool pumpRunning = false;
 unsigned long pumpStopAtMs = 0;
 unsigned long pumpStartedAtMs = 0;
+bool pumpPaused = false;
+unsigned long pausedRemainingSec = 0;
 
 // MANUAL tracking
 bool manualActive = false;          // true เมื่อมีคำสั่งจากเว็บ / กำลังรันตามคำสั่ง
 String pendingOnCommandId = "";
 String lastCommandId = "";          // กันรันซ้ำ
+bool autoEnabled = false;           // เริ่มต้นปิด AUTO จนกว่าจะมีคำสั่งจากเว็บ
+unsigned long lastAckTryMs = 0;
+const unsigned long ACK_RETRY_MS = 5000UL;
 
 // DHT
 DHT dht(DHTPIN, DHTTYPE);
 
 // ------------------ Utils ------------------
+// ???? api_base ??? Cloudflare Worker
+String fetchApiBase() {
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  if (!http.begin(client, CONFIG_URL)) return "";
+  int code = http.GET();
+  String body = http.getString();
+  http.end();
+  if (code != 200) return "";
+
+  StaticJsonDocument<256> doc;
+  if (deserializeJson(doc, body)) return "";
+  const char* base = doc["api_base"];
+  if (!base || !base[0]) return "";
+  return String(base);
+}
+
+void buildEndpoints() {
+  EP_SENSOR = apiBase + "/device/sensor";
+  EP_STATUS = apiBase + "/device-status/status?farm_id=" + String(FARM_ID);
+  EP_POLL   = apiBase + "/device/commands/poll?farm_id=" + String(FARM_ID) + "&device_key=" + String(DEVICE_KEY);
+  EP_ACK    = apiBase + "/device/commands/ack";
+  EP_HEALTH = apiBase + "/health";
+}
+
 static inline void relayWrite(int pin, bool on) {
   if (RELAY_ACTIVE_LOW) digitalWrite(pin, on ? LOW : HIGH);
   else digitalWrite(pin, on ? HIGH : LOW);
@@ -160,7 +217,7 @@ float readLuxSafe() {
 }
 
 // ------------------ HTTPS helpers ------------------
-String httpPostJson(const String& url, const String& json) {
+int httpPostJson(const String& url, const String& json) {
   WiFiClientSecure client;
   client.setInsecure();
   client.setTimeout(12000);
@@ -170,7 +227,8 @@ String httpPostJson(const String& url, const String& json) {
 
   if (!http.begin(client, url)) {
     Serial.printf("[POST] begin() failed: %s\n", url.c_str());
-    return "";
+    noteNetFailure();
+    return -1;
   }
 
   http.addHeader("Content-Type", "application/json");
@@ -183,15 +241,20 @@ String httpPostJson(const String& url, const String& json) {
   Serial.printf("[POST] %s -> %d\n", url.c_str(), code);
   if (code < 0) {
     Serial.printf("HTTPClient error: %s\n", http.errorToString(code).c_str());
+    noteNetFailure();
   } else if (code < 200 || code >= 300) {
     Serial.printf("Body: %s\n", body.c_str());
+    noteNetSuccess();
+  } else {
+    noteNetSuccess();
   }
 
   http.end();
-  return body;
+  return code;
 }
 
-String httpGet(const String& url) {
+int httpGet(const String& url, String& outBody) {
+  outBody = "";
   WiFiClientSecure client;
   client.setInsecure();
   client.setTimeout(12000);
@@ -201,29 +264,43 @@ String httpGet(const String& url) {
 
   if (!http.begin(client, url)) {
     Serial.printf("[GET] begin() failed: %s\n", url.c_str());
-    return "";
+    noteNetFailure();
+    return -1;
   }
 
   // ✅ NEW: ngrok skip warning
   http.addHeader("ngrok-skip-browser-warning", "1");
 
   int code = http.GET();
-  String body = http.getString();
+  outBody = http.getString();
 
   Serial.printf("[GET] %s -> %d\n", url.c_str(), code);
   if (code < 0) {
     Serial.printf("HTTPClient error: %s\n", http.errorToString(code).c_str());
+    noteNetFailure();
   } else if (code < 200 || code >= 300) {
-    Serial.printf("Body: %s\n", body.c_str());
+    Serial.printf("Body: %s\n", outBody.c_str());
+    noteNetSuccess();
+  } else {
+    noteNetSuccess();
   }
 
   http.end();
-  return body;
+  return code;
 }
 
 // ------------------ WiFi ------------------
 void ensureWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
+
+  // ✅ สำคัญ: ก่อนเชื่อม WiFi ให้หยุดปั๊มไว้ก่อนและรอคำสั่งจากระบบ
+  if (pumpRunning) {
+    stopPump();
+  } else {
+    relayWrite(RELAY1_PIN, false);
+    pumpRunning = false;
+    pumpStopAtMs = 0;
+  }
 
   Serial.printf("Connecting WiFi: %s\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
@@ -267,12 +344,14 @@ void handlePumpAutoStop() {
 
 // ------------------ API Actions ------------------
 void testHealth() {
-  String body = httpGet(EP_HEALTH);
-  Serial.printf("Health body: %s\n", body.c_str());
+  // ปิดการเรียก /health ฝั่ง ESP32 ชั่วคราว
+  // (ยังคงฟังก์ชันไว้เผื่อเปิดใช้ในอนาคต)
+  return;
 }
 
 void sendStatus() {
   if (WiFi.status() != WL_CONNECTED) return;
+  if (!netAllowed()) return;
 
   DynamicJsonDocument doc(512);
   doc["device_key"] = DEVICE_KEY;
@@ -293,6 +372,7 @@ void sendStatus() {
 
 void sendSensor() {
   if (WiFi.status() != WL_CONNECTED) return;
+  if (!netAllowed()) return;
 
   float t = dht.readTemperature();
   float h = dht.readHumidity();
@@ -349,8 +429,9 @@ void sendSensor() {
   );
 }
 
-void sendAck(const char* commandId, const char* status, int actualDurationSec) {
-  if (!commandId || !commandId[0]) return;
+bool sendAck(const char* commandId, const char* status, int actualDurationSec) {
+  if (!commandId || !commandId[0]) return false;
+  if (!netAllowed()) return false;
 
   DynamicJsonDocument ack(256);
   ack["farm_id"] = FARM_ID;
@@ -361,13 +442,17 @@ void sendAck(const char* commandId, const char* status, int actualDurationSec) {
 
   String payload;
   serializeJson(ack, payload);
-  httpPostJson(EP_ACK, payload);
+  int code = httpPostJson(EP_ACK, payload);
+  return code >= 200 && code < 300;
 }
 
 void pollCommands() {
   if (WiFi.status() != WL_CONNECTED) return;
+  if (!netAllowed()) return;
 
-  String body = httpGet(EP_POLL);
+  String body;
+  int code = httpGet(EP_POLL, body);
+  if (code < 200 || code >= 300) return;
   if (body.length() < 5) return;
 
   StaticJsonDocument<2048> doc;
@@ -391,6 +476,9 @@ void pollCommands() {
 
   if (cmdStr == "ON") {
     manualActive = true;
+    autoEnabled = true; // ได้รับคำสั่งแล้ว เปิด AUTO ได้
+    pumpPaused = false;
+    pausedRemainingSec = 0;
     if (!pumpRunning) {
       pendingOnCommandId = id;
       startPumpForSeconds(duration > 0 ? duration : 30);
@@ -398,6 +486,29 @@ void pollCommands() {
   } else if (cmdStr == "OFF") {
     manualActive = false;
     stopPump();
+    pumpPaused = false;
+    pausedRemainingSec = 0;
+    if (pendingOnCommandId.length() > 0) {
+      sendAck(pendingOnCommandId.c_str(), "failed", 0);
+      pendingOnCommandId = "";
+      pumpStartedAtMs = 0;
+    }
+    autoEnabled = true; // ได้รับคำสั่งแล้ว เปิด AUTO ได้
+    sendAck(id, "done", 0);
+  } else if (cmdStr == "PAUSE") {
+    if (pumpRunning) {
+      unsigned long remainMs = pumpStopAtMs > millis() ? (pumpStopAtMs - millis()) : 0;
+      pausedRemainingSec = (remainMs + 999) / 1000UL;
+      stopPump();
+      pumpPaused = true;
+    }
+    sendAck(id, "done", 0);
+  } else if (cmdStr == "RESUME") {
+    if (pumpPaused && pausedRemainingSec > 0) {
+      startPumpForSeconds((int)pausedRemainingSec);
+      pumpPaused = false;
+      pausedRemainingSec = 0;
+    }
     sendAck(id, "done", 0);
   } else {
     sendAck(id, "failed", 0);
@@ -407,13 +518,20 @@ void pollCommands() {
 void ackIfOnFinished() {
   if (pendingOnCommandId.length() == 0) return;
   if (pumpRunning) return;
+  if (!netAllowed()) return;
+
+  unsigned long now = millis();
+  if (now - lastAckTryMs < ACK_RETRY_MS) return;
+  lastAckTryMs = now;
 
   unsigned long durMs = 0;
   if (pumpStartedAtMs > 0) durMs = millis() - pumpStartedAtMs;
   int actualSec = (int)(durMs / 1000UL);
   if (actualSec <= 0) actualSec = 1;
 
-  sendAck(pendingOnCommandId.c_str(), "done", actualSec);
+  bool ok = sendAck(pendingOnCommandId.c_str(), "done", actualSec);
+  if (!ok) return;
+
   pendingOnCommandId = "";
   pumpStartedAtMs = 0;
 
@@ -422,6 +540,7 @@ void ackIfOnFinished() {
 
 // ------------------ AUTO logic ------------------
 void autoWateringStep() {
+  if (!autoEnabled) return;
   if (manualActive || pumpRunning) return;
   if ((millis() - lastAutoWaterMs) < AUTO_COOLDOWN_MS) return;
 
@@ -453,6 +572,7 @@ void setup() {
 
   pinMode(RELAY1_PIN, OUTPUT);
   pinMode(RELAY2_PIN, OUTPUT);
+  // ✅ เริ่มต้นให้ปั๊มหยุดไว้ก่อน (ก่อนเชื่อม WiFi / ก่อนรับคำสั่ง)
   relayWrite(RELAY1_PIN, false);
   relayWrite(RELAY2_PIN, false);
 
@@ -467,10 +587,16 @@ void setup() {
 
   ensureWiFi();
 
+  String newBase = fetchApiBase();
+  if (newBase.length() > 0) {
+    apiBase = newBase;
+  }
+  buildEndpoints();
+
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
   delay(500);
 
-  testHealth();
+  // testHealth(); // ปิดไว้เพื่อลดทราฟฟิกที่ไม่จำเป็น
 }
 
 void loop() {
@@ -478,14 +604,15 @@ void loop() {
 
   handlePumpAutoStop();
   ackIfOnFinished();
-  autoWateringStep();
+  // autoWateringStep(); // disable auto watering for now
 
   unsigned long now = millis();
 
-  if (now - lastHealthMs >= HEALTH_INTERVAL_MS) {
-    lastHealthMs = now;
-    testHealth();
-  }
+  // ปิดการเรียก /health ฝั่ง ESP32 ชั่วคราว
+  // if (now - lastHealthMs >= HEALTH_INTERVAL_MS) {
+  //   lastHealthMs = now;
+  //   testHealth();
+  // }
 
   if (now - lastStatusMs >= STATUS_INTERVAL_MS) {
     lastStatusMs = now;

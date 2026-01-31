@@ -47,7 +47,8 @@ export default function PumpControl() {
         duration_sec: command === "ON" ? Number(duration || 30) : 0,
         device_id: "pump",
       });
-      toast?.push?.({ type: "success", message: `สั่งปั๊ม: ${command}` });
+      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
+      toast?.push?.({ type: "success", message: `สั่งงานปั๊ม: ${action}` });
       await loadAll();
     } catch (e) {
       toast?.push?.({ type: "error", message: e?.response?.data?.detail || "สั่งปั๊มไม่สำเร็จ" });
@@ -107,8 +108,8 @@ export default function PumpControl() {
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-lg font-semibold">ควบคุมปั๊มน้ำ</div>
-            <div className="text-sm text-gray-500">สั่ง ON/OFF และกำหนดเวลา (วินาที)</div>
+            <div className="text-lg font-semibold">ควบคุมการรดน้ำ</div>
+            <div className="text-sm text-gray-500">สั่งเริ่ม/หยุด และกำหนดเวลา (วินาที)</div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -120,10 +121,10 @@ export default function PumpControl() {
               placeholder="30"
             />
             <Button disabled={busy} onClick={() => sendCommand("ON")}>
-              {busy ? <Spinner /> : "เปิด"}
+              {busy ? <Spinner /> : "เริ่มรดน้ำ"}
             </Button>
             <Button disabled={busy} variant="danger" onClick={() => sendCommand("OFF")}>
-              {busy ? <Spinner /> : "ปิด"}
+              {busy ? <Spinner /> : "หยุดรดน้ำ"}
             </Button>
           </div>
         </div>
@@ -134,7 +135,7 @@ export default function PumpControl() {
           <div>
             <div className="text-lg font-semibold">ตั้งค่าระบบรดน้ำ</div>
             <div className="text-sm text-gray-500">
-              ตั้งอัตราการไหล (เพื่อคำนวณลิตร) และตั้ง schedule (วัน/เวลา)
+              ตั้งอัตราการไหล (เพื่อคำนวณลิตร) และตั้งตารางรดน้ำ (วัน/เวลา)
             </div>
           </div>
           <Button onClick={saveSettings} disabled={saving}>
@@ -144,7 +145,7 @@ export default function PumpControl() {
 
         <div className="grid gap-3 md:grid-cols-3">
           <div>
-            <div className="text-sm mb-1">device_key (ต้องตรงกับ ESP32)</div>
+            <div className="text-sm mb-1">รหัสอุปกรณ์ (ต้องตรงกับ ESP32)</div>
             <Input
               value={settings?.device_key || ""}
               onChange={(e) => updateSetting({ device_key: e.target.value })}
@@ -163,7 +164,7 @@ export default function PumpControl() {
           </div>
 
           <div>
-            <div className="text-sm mb-1">sampling_interval_min</div>
+            <div className="text-sm mb-1">ช่วงเวลาวัดค่า (นาที)</div>
             <Input
               type="number"
               value={settings?.sampling_interval_min ?? 5}
@@ -174,8 +175,8 @@ export default function PumpControl() {
         </div>
 
         <div className="flex items-center justify-between mt-2">
-          <div className="font-semibold">Schedule (รดน้ำตามวัน/เวลา)</div>
-          <Button onClick={addSchedule}>เพิ่ม schedule</Button>
+          <div className="font-semibold">ตารางรดน้ำ (วัน/เวลา)</div>
+          <Button onClick={addSchedule}>เพิ่มตาราง</Button>
         </div>
 
         <div className="space-y-3">
@@ -188,8 +189,8 @@ export default function PumpControl() {
                     checked={!!s.enabled}
                     onChange={(e) => setScheduleField(idx, "enabled", e.target.checked)}
                   />
-                  <span className="font-semibold">Schedule #{idx + 1}</span>
-                  {s.enabled ? <Badge>ON</Badge> : <Badge variant="secondary">OFF</Badge>}
+                  <span className="font-semibold">รอบที่ #{idx + 1}</span>
+                  {s.enabled ? <Badge>เปิด</Badge> : <Badge variant="secondary">ปิด</Badge>}
                 </div>
                 <Button variant="danger" onClick={() => removeSchedule(idx)}>
                   ลบ
@@ -289,9 +290,9 @@ export default function PumpControl() {
               <tr className="text-left border-b">
                 <th className="py-2">เวลา</th>
                 <th className="py-2">คำสั่ง</th>
-                <th className="py-2">Duration</th>
+                <th className="py-2">ระยะเวลา</th>
                 <th className="py-2">สถานะ</th>
-                <th className="py-2">Source</th>
+                <th className="py-2">แหล่งคำสั่ง</th>
               </tr>
             </thead>
             <tbody>

@@ -261,15 +261,15 @@ VPD บอกว่าอากาศแห้ง/ชื้นแค่ไหน
    ✅ รายการกราฟทั้งหมด
    =========================== */
 const CHARTS = [
-  { id: "temperature", label: "อุณหภูมิ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
+  { id: "temperature", label: "อุณหภูมิอากาศ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
   { id: "humidity_air", label: "ความชื้นอากาศ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
   { id: "soil_moisture", label: "ความชื้นดิน (%)", type: "sensor", dataKey: "soil_moisture", unit: "%" },
-  { id: "light_lux", label: "แสง (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
+  { id: "light_lux", label: "แสงที่พืชได้รับ (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
 
-  { id: "vpd", label: "VPD (kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
-  { id: "gdd", label: "GDD (°C)", type: "index", dataKey: "gdd", unit: "°C" },
+  { id: "vpd", label: "ความแห้งของอากาศ (VPD, kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
+  { id: "gdd", label: "ความร้อนสะสม (GDD, °C)", type: "index", dataKey: "gdd", unit: "°C" },
   { id: "dew_point", label: "จุดน้ำค้าง (°C)", type: "index", dataKey: "dew_point", unit: "°C" },
-  { id: "soil_drying_rate", label: "อัตราดินแห้ง (%/min)", type: "index", dataKey: "soil_drying_rate", unit: "%/min" },
+  { id: "soil_drying_rate", label: "ความเร็วที่ดินแห้ง (%/นาที)", type: "index", dataKey: "soil_drying_rate", unit: "%/min" },
 ];
 
 const WEEKDAY_LABEL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสฯ", "ศุกร์", "เสาร์"];
@@ -389,7 +389,7 @@ export default function Dashboard() {
       setFarms(list);
 
       if (!list.length) {
-        setLoading(false);
+        setLoading(false);          
         setErr("ยังไม่มีฟาร์มในระบบ");
         return;
       }
@@ -440,7 +440,7 @@ export default function Dashboard() {
       setIndexLatest(idxLatestRes.data || null);
       setIndexHistory(Array.isArray(idxHistoryRes.data) ? idxHistoryRes.data : []);
     } catch (e) {
-      setErr(pickError(e, "โหลดข้อมูล Dashboard ไม่สำเร็จ"));
+      setErr(pickError(e, "โหลดข้อมูลภาพรวมไม่สำเร็จ"));
     } finally {
       if (!silent) setLoading(false); else setRefreshing(false);
     }
@@ -671,7 +671,7 @@ export default function Dashboard() {
                 ]
               : []
           ),
-          "Settings"
+          "ตั้งค่า"
         );
       }
 
@@ -687,7 +687,7 @@ export default function Dashboard() {
               is_read: n.is_read,
             }))
           ),
-          "Notifications"
+          "แจ้งเตือน"
         );
       }
 
@@ -705,10 +705,10 @@ export default function Dashboard() {
       const filename = `SmartFarm_${farmName}_Dashboard${suffix}.xlsx`;
 
       saveAs(file, filename);
-      toast.success("Export Excel สำเร็จ 🎉");
+      toast.success("ส่งออกไฟล์ Excel สำเร็จ 🎉");
     } catch (e) {
       console.error("Export Excel error:", e);
-      toast.error(pickError(e, "ส่งออก Excel ไม่สำเร็จ"));
+      toast.error(pickError(e, "ส่งออกไฟล์ไม่สำเร็จ"));
     } finally {
       setExportBusy(false);
     }
@@ -822,7 +822,7 @@ export default function Dashboard() {
       const filename = `SmartFarm_AllFarms_Sheets${suffix}.xlsx`;
       saveAs(file, filename);
 
-      toast.success("Export ทุกฟาร์มสำเร็จ 🎉");
+      toast.success("ส่งออกทุกฟาร์มสำเร็จ 🎉");
     } catch (e) {
       console.error("Export All Farms error:", e);
       toast.error(pickError(e, "ส่งออกข้อมูลทุกฟาร์มไม่สำเร็จ"));
@@ -875,7 +875,7 @@ export default function Dashboard() {
       {/* ✅ Export Options */}
       <Modal
         open={openExportModal}
-        title="เลือกข้อมูลสำหรับ Export"
+        title="เลือกข้อมูลที่จะส่งออก"
         onClose={() => setOpenExportModal(false)}
       >
         <div className="space-y-4">
@@ -886,7 +886,7 @@ export default function Dashboard() {
           </div>
 
           <div>
-            <div className="text-sm text-gray-600 mb-1">เลือกเดือน (เฉพาะที่มีข้อมูล)</div>
+            <div className="text-sm text-gray-600 mb-1">เลือกเดือน (เฉพาะเดือนที่มีข้อมูล)</div>
             <div className="flex flex-wrap gap-2 items-center">
               <select
                 value={exportMonth}
@@ -913,7 +913,7 @@ export default function Dashboard() {
                 checked={exportOptions.sensor}
                 onChange={(e) => setExportOptions((p) => ({ ...p, sensor: e.target.checked }))}
               />
-              Sensor History
+              ประวัติค่าเซนเซอร์
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -921,7 +921,7 @@ export default function Dashboard() {
                 checked={exportOptions.index}
                 onChange={(e) => setExportOptions((p) => ({ ...p, index: e.target.checked }))}
               />
-              Index History
+              ค่าคำนวณ (Index)
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -930,7 +930,7 @@ export default function Dashboard() {
                 onChange={(e) => setExportOptions((p) => ({ ...p, settings: e.target.checked }))}
                 disabled={exportMode === "all"}
               />
-              Settings
+              ค่าตั้งค่า
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -939,7 +939,7 @@ export default function Dashboard() {
                 onChange={(e) => setExportOptions((p) => ({ ...p, notifications: e.target.checked }))}
                 disabled={exportMode === "all"}
               />
-              Notifications
+              การแจ้งเตือน
             </label>
           </div>
 
@@ -958,9 +958,9 @@ export default function Dashboard() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
-            <div className="text-2xl font-bold text-gray-900">แดชบอร์ด</div>
+            <div className="text-2xl font-bold text-gray-900">ภาพรวมระบบฟาร์ม</div>
             <div className="text-sm text-gray-500">
-              เลือกวันที่เพื่อดูข้อมูลเฉพาะวัน และเลือกกราฟที่ต้องการแสดงได้
+              เลือกฟาร์มและวันที่เพื่อดูข้อมูลเฉพาะวัน เหมาะสำหรับติดตามแปลงผักบุ้ง
             </div>
           </div>
 
@@ -969,13 +969,13 @@ export default function Dashboard() {
               variant="outline"
               onClick={() => setOpenChartPicker((v) => !v)}
             >
-              {openChartPicker ? "ปิดตัวเลือกกราฟ" : "เลือกกราฟที่ต้องการแสดง"}
+              {openChartPicker ? "ปิดรายการกราฟ" : "เลือกกราฟที่อยากดู"}
             </Button>
 
             {/* ✅ Export Excel (ปุ่มเดียว + เมนูย่อย) */}
             <div className="relative" ref={exportMenuRef}>
               <Button onClick={() => setOpenExportMenu((v) => !v)}>
-                Export Excel
+                ส่งออก Excel
               </Button>
 
               {openExportMenu ? (
@@ -991,7 +991,7 @@ export default function Dashboard() {
                   >
                     📌 ส่งออกฟาร์มที่เลือก (Excel)
                     <div className="text-xs text-gray-500 mt-1">
-                      รวม Sensor + Index + Settings + Notifications
+                      รวมข้อมูลเซนเซอร์ + ค่าคำนวณ + ตั้งค่า + แจ้งเตือน
                       {selectedDate ? ` (เฉพาะวันที่ ${selectedDate})` : ""}
                     </div>
                   </button>
@@ -1007,9 +1007,9 @@ export default function Dashboard() {
                     }}
                     disabled={loading || exportAllBusy || !farms.length}
                   >
-                    🗂️ ส่งออกทุกฟาร์ม (แยก Sheet)
+                    🗂️ ส่งออกทุกฟาร์ม (แยกชีต)
                     <div className="text-xs text-gray-500 mt-1">
-                      แยกเป็น SensorHistory / IndexHistory ต่อฟาร์ม
+                      แยกเป็นประวัติเซนเซอร์/ค่าคำนวณของแต่ละฟาร์ม
                       {selectedDate ? ` (เฉพาะวันที่ ${selectedDate})` : ""}
                     </div>
                   </button>
@@ -1127,7 +1127,7 @@ export default function Dashboard() {
             <SummaryCard
               title={
                 <>
-                  อุณหภูมิ
+                  อุณหภูมิอากาศ
                   <div className="text-xs text-gray-500 mt-1">- °C</div>
                 </>
               }
@@ -1164,7 +1164,7 @@ export default function Dashboard() {
             <SummaryCard
               title={
                 <>
-                  แสง (lux)
+                  แสงที่พืชได้รับ
                   <div className="text-xs text-gray-500 mt-1">- lux</div>
                 </>
               }
@@ -1176,7 +1176,7 @@ export default function Dashboard() {
             <SummaryCard
               title={
                 <>
-                  VPD
+                  ความแห้งของอากาศ (VPD)
                   <div className="text-xs text-gray-500 mt-1">- kPa</div>
                 </>
               }
@@ -1188,7 +1188,7 @@ export default function Dashboard() {
             <SummaryCard
               title={
                 <>
-                  GDD
+                  ความร้อนสะสม (GDD)
                   <div className="text-xs text-gray-500 mt-1">- °C</div>
                 </>
               }
@@ -1212,7 +1212,7 @@ export default function Dashboard() {
             <SummaryCard
               title={
                 <>
-                  อัตราดินแห้ง
+                  ความเร็วที่ดินแห้ง
                   <div className="text-xs text-gray-500 mt-1">- %/min</div>
                 </>
               }
@@ -1228,10 +1228,10 @@ export default function Dashboard() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="text-lg font-bold text-gray-900">
-                    เลือกกราฟที่ต้องการแสดง
+                    เลือกกราฟที่อยากดู
                   </div>
                   <div className="text-sm text-gray-500">
-                    กดเพื่อเปิด/ปิดกราฟ (ระบบจำการเลือกไว้ให้)
+                    กดเพื่อเปิด/ปิดกราฟ ระบบจะจำไว้ให้
                   </div>
                 </div>
 
@@ -1279,7 +1279,7 @@ export default function Dashboard() {
             {visibleCharts.length === 0 ? (
               <Card className="p-6 lg:col-span-2">
                 <div className="text-sm text-gray-600">
-                  ยังไม่ได้เลือกกราฟที่ต้องการแสดง (กด “เลือกกราฟที่ต้องการแสดง” ด้านบน)
+                  ยังไม่ได้เลือกกราฟที่อยากดู (กด “เลือกกราฟที่อยากดู” ด้านบน)
                 </div>
               </Card>
             ) : (
@@ -1299,8 +1299,8 @@ export default function Dashboard() {
           {/* Farm Settings */}
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <div className="text-lg font-semibold text-gray-900">Farm Settings</div>
-              <Badge>Automation</Badge>
+              <div className="text-lg font-semibold text-gray-900">ตั้งค่าฟาร์ม</div>
+              <Badge>อัตโนมัติ</Badge>
             </div>
 
             {!settings ? (
@@ -1309,19 +1309,19 @@ export default function Dashboard() {
               <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div className="rounded-2xl border border-gray-100 p-4">
-                    <div className="text-gray-500">Sampling Interval</div>
+                    <div className="text-gray-500">ช่วงเวลาวัดค่า</div>
                     <div className="font-semibold text-gray-900 mt-1">
                       {settings.sampling_interval_min ?? "-"} นาที
                     </div>
                   </div>
                   <div className="rounded-2xl border border-gray-100 p-4">
-                    <div className="text-gray-500">Watering Duration</div>
+                    <div className="text-gray-500">เวลารดน้ำต่อครั้ง</div>
                     <div className="font-semibold text-gray-900 mt-1">
                       {settings.watering_duration_sec ?? "-"} วินาที
                     </div>
                   </div>
                   <div className="rounded-2xl border border-gray-100 p-4">
-                    <div className="text-gray-500">Watering Cooldown</div>
+                    <div className="text-gray-500">พักก่อนรดน้ำรอบถัดไป</div>
                     <div className="font-semibold text-gray-900 mt-1">
                       {settings.watering_cooldown_min ?? "-"} นาที
                     </div>

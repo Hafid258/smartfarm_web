@@ -59,6 +59,9 @@ export default function FarmSettings() {
     watering_duration_sec: 10,
     watering_cooldown_min: 10,
     watering_schedules: [],
+    auto_soil_enabled: false,
+    auto_soil_start_at: 35,
+    auto_soil_stop_at: 50,
   });
 
   async function loadFarms() {
@@ -84,6 +87,9 @@ export default function FarmSettings() {
           watering_duration_sec: s.watering_duration_sec ?? 10,
           watering_cooldown_min: s.watering_cooldown_min ?? 10,
           watering_schedules: normalizeSchedules(s),
+          auto_soil_enabled: Boolean(s.auto_soil_enabled),
+          auto_soil_start_at: s.auto_soil_start_at ?? 35,
+          auto_soil_stop_at: s.auto_soil_stop_at ?? 50,
         });
       }
     } catch (e) {
@@ -114,6 +120,9 @@ export default function FarmSettings() {
         watering_duration_sec: clampNum(form.watering_duration_sec, 1, 3600, 10),
         watering_cooldown_min: clampNum(form.watering_cooldown_min, 0, 1440, 10),
         watering_schedules: form.watering_schedules,
+        auto_soil_enabled: Boolean(form.auto_soil_enabled),
+        auto_soil_start_at: clampNum(form.auto_soil_start_at, 1, 100, 35),
+        auto_soil_stop_at: clampNum(form.auto_soil_stop_at, 1, 100, 50),
       };
 
       await api.post(`/settings/my?farm_id=${encodeURIComponent(farmId)}`, payload);
@@ -130,8 +139,8 @@ export default function FarmSettings() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Farm Settings</div>
-          <div className="text-sm text-gray-500">ปรับ settings ต่อฟาร์ม (admin override)</div>
+          <div className="text-2xl font-bold text-gray-900">ตั้งค่าฟาร์ม</div>
+          <div className="text-sm text-gray-500">ปรับค่าการดูแลแปลงผักบุ้งรายฟาร์ม</div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -140,7 +149,7 @@ export default function FarmSettings() {
             value={farmId}
             onChange={(e) => setFarmId(e.target.value)}
           >
-            {farms.length === 0 ? <option value="">No farms</option> : farms.map((f) => (
+            {farms.length === 0 ? <option value="">ไม่มีฟาร์ม</option> : farms.map((f) => (
               <option key={f._id} value={f._id}>{f.farm_name}</option>
             ))}
           </select>
@@ -167,13 +176,26 @@ export default function FarmSettings() {
           <div className="space-y-5">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">Automation</div>
-                <Badge variant="blue">advanced</Badge>
+                <div className="text-lg font-semibold text-gray-900">ระบบอัตโนมัติ</div>
+                <Badge variant="blue">ขั้นสูง</Badge>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="lg:col-span-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.auto_soil_enabled)}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, auto_soil_enabled: e.target.checked }))
+                      }
+                    />
+                    เปิดระบบรดน้ำตามความชื้นดิน (เหมาะกับผักบุ้งที่ชอบดินชื้น)
+                  </label>
+                </div>
+
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Sampling Interval (นาที)</div>
+                  <div className="text-sm text-gray-600 mb-1">ช่วงเวลาวัดค่า (นาที)</div>
                   <Input
                     type="number"
                     value={form.sampling_interval_min}
@@ -182,7 +204,7 @@ export default function FarmSettings() {
                 </div>
 
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Watering Duration (วินาที)</div>
+                  <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที)</div>
                   <Input
                     type="number"
                     value={form.watering_duration_sec}
@@ -191,11 +213,33 @@ export default function FarmSettings() {
                 </div>
 
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Watering Cooldown (นาที)</div>
+                  <div className="text-sm text-gray-600 mb-1">พักก่อนรดน้ำรอบถัดไป (นาที)</div>
                   <Input
                     type="number"
                     value={form.watering_cooldown_min}
                     onChange={(e) => setForm((p) => ({ ...p, watering_cooldown_min: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">ความชื้นเริ่มรด (%)</div>
+                  <Input
+                    type="number"
+                    value={form.auto_soil_start_at}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, auto_soil_start_at: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">ความชื้นหยุดรด (%)</div>
+                  <Input
+                    type="number"
+                    value={form.auto_soil_stop_at}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, auto_soil_stop_at: e.target.value }))
+                    }
                   />
                 </div>
               </div>

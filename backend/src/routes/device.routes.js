@@ -7,6 +7,7 @@ import DeviceCommand from "../models/DeviceCommand.js";
 import SensorData from "../models/SensorData.js";
 import IndexData from "../models/IndexData.js";
 import FarmSetting from "../models/FarmSetting.js";
+import FarmAlertRule from "../models/FarmAlertRule.js";
 import Notification from "../models/Notification.js";
 import NotificationSetting from "../models/NotificationSetting.js";
 import User from "../models/User.js";
@@ -47,6 +48,11 @@ function calcVPD(t, rh) {
 
 function calcGDD(t, baseTemp = 10) {
   return Math.max(0, t - baseTemp);
+}
+
+function clampNum(v, lo, hi) {
+  if (!Number.isFinite(v)) return lo;
+  return Math.min(hi, Math.max(lo, v));
 }
 
 async function sendDiscord(url, content) {
@@ -137,6 +143,99 @@ async function checkZeroValuesAndNotify(farm_id) {
   }
 }
 
+async function maybeCreateAutoSoilCommand({ farm_id, soil_moisture, setting }) {
+  if (!setting?.auto_soil_enabled) return;
+  if (setting?.pump_paused) return;
+
+  const startAt = Number(setting.auto_soil_start_at ?? 35);
+  const soil = Number(soil_moisture ?? 0);
+  if (!Number.isFinite(soil) || soil > startAt) return;
+
+  const cooldownMin = clampNum(Number(setting.watering_cooldown_min ?? 5), 1, 1440);
+  const cooldownMs = cooldownMin * 60 * 1000;
+  const bucket = Math.floor(Date.now() / cooldownMs);
+  const scheduled_key = `soil|${String(farm_id)}|${bucket}`;
+
+  const hasPending = await DeviceCommand.findOne({
+    ...farmQueryAnyType(farm_id),
+    status: "pending",
+    command: "ON",
+  })
+    .select("_id")
+    .lean();
+
+  if (hasPending) return;
+
+  const exists = await DeviceCommand.findOne({
+    ...farmQueryAnyType(farm_id),
+    command: "ON",
+    scheduled_key,
+  })
+    .select("_id")
+    .lean();
+
+  if (exists) return;
+
+  const duration_sec = clampNum(Number(setting.watering_duration_sec ?? 30), 1, 3600);
+
+  await DeviceCommand.create({
+    farm_id: farmIdForStore(farm_id),
+    device_id: "pump",
+    command: "ON",
+    duration_sec,
+    status: "pending",
+    source: "auto",
+    timestamp: new Date(),
+    scheduled_key,
+  });
+}
+
+async function maybeNotifyAlertRules({ farm_id, metrics }) {
+  const rules = await FarmAlertRule.find({ farm_id, enabled: true }).lean();
+  if (!rules.length) return;
+
+  const farmObjectId = asObjectIdOrNull(farm_id);
+  const now = new Date();
+  const since = new Date(Date.now() - 30 * 60 * 1000);
+
+  for (const rule of rules) {
+    const value = metrics[rule.metric];
+    if (!Number.isFinite(value)) continue;
+
+    const pass = rule.operator === "lt" ? value < rule.threshold : value > rule.threshold;
+    if (!pass) continue;
+
+    const alertType = `rule_${rule._id}`;
+    if (farmObjectId) {
+      const existing = await Notification.findOne({
+        farm_id: farmObjectId,
+        alert_type: alertType,
+        timestamp: { $gte: since },
+      })
+        .select("_id")
+        .lean();
+      if (existing) continue;
+    }
+
+    const details = `${rule.message} (ค่า=${Number(value).toFixed(2)})`;
+
+    if (farmObjectId) {
+      await Notification.create({
+        farm_id: farmObjectId,
+        timestamp: now,
+        alert_type: alertType,
+        details,
+        severity: "medium",
+        sent_to: "system",
+        sent_status: "success",
+        rule_id: rule._id,
+        recommended_action: rule.action === "water" ? "water" : "",
+        recommended_duration_sec: rule.action === "water" ? rule.duration_sec ?? null : null,
+      });
+    }
+  }
+}
+
 /**
  * =========================
  * ✅ PUBLIC DEVICE ENDPOINTS (ESP32)
@@ -218,6 +317,33 @@ router.post("/sensor", async (req, res) => {
       console.warn("ZERO VALUE NOTIFY ERROR:", notifyErr);
     }
 
+    try {
+      await maybeNotifyAlertRules({
+        farm_id,
+        metrics: {
+          temperature,
+          humidity_air,
+          soil_moisture,
+          vpd,
+          gdd,
+          dew_point,
+          soil_drying_rate,
+        },
+      });
+    } catch (notifyErr) {
+      console.warn("ALERT RULE NOTIFY ERROR:", notifyErr);
+    }
+
+    try {
+      await maybeCreateAutoSoilCommand({
+        farm_id,
+        soil_moisture,
+        setting,
+      });
+    } catch (autoErr) {
+      console.warn("AUTO SOIL ERROR:", autoErr);
+    }
+
     return res.json({ ok: true, sensor_id: sensorDoc._id });
   } catch (err) {
     console.error("DEVICE SENSOR ERROR:", err);
@@ -247,7 +373,20 @@ router.get("/commands/poll", async (req, res) => {
       .sort({ timestamp: -1 })
       .lean();
 
-    return res.json(cmd || null);
+    if (!cmd) return res.json(null);
+
+    const lastSentAt = cmd.last_sent_at ? new Date(cmd.last_sent_at).getTime() : 0;
+    const now = Date.now();
+    if (lastSentAt && now - lastSentAt < 3000) {
+      return res.json(null);
+    }
+
+    await DeviceCommand.updateOne(
+      { _id: cmd._id },
+      { $set: { last_sent_at: new Date() }, $inc: { send_count: 1 } }
+    );
+
+    return res.json(cmd);
   } catch (err) {
     console.error("DEVICE POLL ERROR:", err);
     return res.status(500).json({ error: err?.message || "Failed to poll device commands" });

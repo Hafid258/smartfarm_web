@@ -17,7 +17,7 @@ const DeviceCommandSchema = new mongoose.Schema(
 
     device_id: { type: String, default: "pump" },
 
-    command: { type: String, enum: ["ON", "OFF"], required: true },
+    command: { type: String, enum: ["ON", "OFF", "PAUSE", "RESUME"], required: true },
 
     // ระยะเวลาที่ให้รดน้ำ (วินาที) เฉพาะคำสั่ง ON
     duration_sec: { type: Number, default: 0 },
@@ -48,6 +48,10 @@ const DeviceCommandSchema = new mongoose.Schema(
 
     // กันซ้ำสำหรับ schedule (farm|YYYY-MM-DD|HH:mm)
     scheduled_key: { type: String, default: null, index: true },
+
+    // poll tracking (avoid spamming device)
+    last_sent_at: { type: Date, default: null },
+    send_count: { type: Number, default: 0 },
   },
   { versionKey: false }
 );

@@ -42,6 +42,8 @@ export default function AlertRules() {
   const [operator, setOperator] = useState("gt");
   const [threshold, setThreshold] = useState("");
   const [message, setMessage] = useState("");
+  const [actionWater, setActionWater] = useState(false);
+  const [actionDuration, setActionDuration] = useState(30);
 
   // ✅ แก้ไข rule
   const [editId, setEditId] = useState(null);
@@ -91,11 +93,13 @@ export default function AlertRules() {
     setOperator("gt");
     setThreshold("");
     setMessage("");
+    setActionWater(false);
+    setActionDuration(30);
   };
 
   const onCreate = async () => {
     if (!threshold || message.trim() === "") {
-      toast.error("กรุณากำหนดค่า threshold และข้อความแจ้งเตือน");
+      toast.error("กรุณากำหนดค่าเงื่อนไขและข้อความแจ้งเตือน");
       return;
     }
 
@@ -107,6 +111,8 @@ export default function AlertRules() {
         threshold: Number(threshold),
         message: message.trim(),
         enabled: true,
+        action: actionWater ? "water" : "none",
+        duration_sec: actionWater ? Number(actionDuration || 30) : null,
       });
 
       toast.success("สร้างกฎสำเร็จ ✅");
@@ -153,6 +159,8 @@ export default function AlertRules() {
       threshold: String(rule.threshold),
       message: rule.message,
       enabled: rule.enabled,
+      action: rule.action || "none",
+      duration_sec: rule.duration_sec ?? 30,
     });
   };
 
@@ -165,7 +173,7 @@ export default function AlertRules() {
     if (!editId || !editForm) return;
 
     if (!editForm.threshold || editForm.message.trim() === "") {
-      toast.error("กรุณากำหนด threshold และข้อความ");
+      toast.error("กรุณากำหนดค่าเงื่อนไขและข้อความ");
       return;
     }
 
@@ -177,6 +185,9 @@ export default function AlertRules() {
         threshold: Number(editForm.threshold),
         message: editForm.message.trim(),
         enabled: editForm.enabled,
+        action: editForm.action || "none",
+        duration_sec:
+          editForm.action === "water" ? Number(editForm.duration_sec || 30) : null,
       });
 
       toast.success("แก้ไขสำเร็จ ✅");
@@ -197,9 +208,9 @@ export default function AlertRules() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-2xl font-bold text-gray-900">ตั้งค่าการแจ้งเตือน</div>
-          <div className="text-sm text-gray-500">
-            สร้างกฎแจ้งเตือนตามค่าที่สูง/ต่ำกว่า และกำหนดข้อความเองได้
-          </div>
+            <div className="text-sm text-gray-500">
+              กำหนดกฎแจ้งเตือนสำหรับแปลงผักบุ้งแต่ละฟาร์ม
+            </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -231,9 +242,9 @@ export default function AlertRules() {
       {/* Create Form */}
       <Card className="p-5">
         <div className="text-lg font-bold text-gray-900">สร้างกฎใหม่</div>
-        <div className="text-sm text-gray-500 mt-1">
-          เลือกประเภท → เลือกต่ำกว่า/สูงกว่า → ใส่ค่า → ใส่ข้อความ → บันทึก
-        </div>
+          <div className="text-sm text-gray-500 mt-1">
+            เลือกประเภท → เลือกต่ำกว่า/สูงกว่า → ใส่ค่า → ใส่ข้อความ → บันทึก
+          </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <div>
@@ -264,7 +275,7 @@ export default function AlertRules() {
           </div>
 
           <div>
-            <div className="text-sm font-semibold">ค่า Threshold</div>
+            <div className="text-sm font-semibold">ค่าเงื่อนไข</div>
             <Input
               type="number"
               value={threshold}
@@ -286,6 +297,31 @@ export default function AlertRules() {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="เช่น อุณหภูมิสูงมาก ระวังพืชเฉา"
             />
+          </div>
+
+          <div className="md:col-span-4 flex flex-wrap gap-3 items-center">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={actionWater}
+                onChange={(e) => setActionWater(e.target.checked)}
+              />
+              แนะนำให้รดน้ำเมื่อเข้าเงื่อนไข
+            </label>
+
+            {actionWater ? (
+              <div className="flex items-center gap-2 text-sm">
+                <span>ระยะเวลา (วินาที)</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={3600}
+                  value={actionDuration}
+                  onChange={(e) => setActionDuration(e.target.value)}
+                  className="w-28"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </Card>
@@ -388,7 +424,7 @@ export default function AlertRules() {
                       </div>
 
                       <div>
-                        <div className="text-sm font-semibold">Threshold</div>
+                        <div className="text-sm font-semibold">ค่าเงื่อนไข</div>
                         <Input
                           type="number"
                           value={editForm.threshold}
@@ -412,6 +448,41 @@ export default function AlertRules() {
                             setEditForm((p) => ({ ...p, message: e.target.value }))
                           }
                         />
+                      </div>
+
+                      <div className="md:col-span-4 flex flex-wrap gap-3 items-center">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={editForm.action === "water"}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                action: e.target.checked ? "water" : "none",
+                              }))
+                            }
+                          />
+                          แนะนำให้รดน้ำเมื่อเข้าเงื่อนไข
+                        </label>
+
+                        {editForm.action === "water" ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span>ระยะเวลา (วินาที)</span>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={3600}
+                              value={editForm.duration_sec ?? 30}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  duration_sec: e.target.value,
+                                }))
+                              }
+                              className="w-28"
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}

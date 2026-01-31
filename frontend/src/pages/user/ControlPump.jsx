@@ -38,13 +38,20 @@ export default function ControlPump() {
   const [duration, setDuration] = useState(10); // seconds
   const [logs, setLogs] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
+  const [settings, setSettings] = useState(null);
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [pauseBusy, setPauseBusy] = useState(false);
 
-  async function loadLogs() {
+  async function loadAll() {
     setErr("");
     try {
       setLoadingLog(true);
-      const res = await api.get("/device/commands?limit=30"); // ไม่ส่ง farm_id
-      setLogs(Array.isArray(res.data) ? res.data : []);
+      const [logRes, settingRes] = await Promise.all([
+        api.get("/device/commands?limit=30"),
+        api.get("/settings/my"),
+      ]);
+      setLogs(Array.isArray(logRes.data) ? logRes.data : []);
+      setSettings(settingRes.data || null);
     } catch (e) {
       setErr(e.message || "โหลดประวัติคำสั่งไม่สำเร็จ");
     } finally {
@@ -53,7 +60,7 @@ export default function ControlPump() {
   }
 
   useEffect(() => {
-    loadLogs();
+    loadAll();
   }, []);
 
   const availableDates = useMemo(() => {
@@ -86,8 +93,9 @@ export default function ControlPump() {
         command,
         duration_sec: Number(duration) || undefined,
       });
-      toast.success(`ส่งคำสั่งปั๊ม: ${command} สำเร็จ`);
-      await loadLogs();
+      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
+      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
+      await loadAll();
     } catch (e) {
       toast.error(e.message || "ส่งคำสั่งไม่สำเร็จ");
     } finally {
@@ -95,14 +103,65 @@ export default function ControlPump() {
     }
   }
 
+  async function toggleAutoSoil() {
+    try {
+      if (!settings) return;
+      setAutoBusy(true);
+      const next = !settings.auto_soil_enabled;
+      const payload = {
+        ...settings,
+        auto_soil_enabled: next,
+      };
+      await api.post("/settings/my", payload);
+      toast.success(next ? "เปิดระบบรดน้ำตามความชื้นแล้ว" : "ปิดระบบรดน้ำตามความชื้นแล้ว");
+      await loadAll();
+    } catch (e) {
+      toast.error(e.message || "อัปเดตไม่สำเร็จ");
+    } finally {
+      setAutoBusy(false);
+    }
+  }
+
+  async function pausePump() {
+    try {
+      setPauseBusy(true);
+      await api.post("/device/command", { command: "PAUSE" });
+      if (settings) {
+        await api.post("/settings/my", { ...settings, pump_paused: true });
+      }
+      toast.success("พักปั๊มชั่วคราวแล้ว");
+      await loadAll();
+    } catch (e) {
+      toast.error(e.message || "พักปั๊มไม่สำเร็จ");
+    } finally {
+      setPauseBusy(false);
+    }
+  }
+
+  async function resumePump() {
+    try {
+      setPauseBusy(true);
+      await api.post("/device/command", { command: "RESUME" });
+      if (settings) {
+        await api.post("/settings/my", { ...settings, pump_paused: false });
+      }
+      toast.success("สั่งปั๊มทำงานต่อแล้ว");
+      await loadAll();
+    } catch (e) {
+      toast.error(e.message || "สั่งต่อไม่สำเร็จ");
+    } finally {
+      setPauseBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">ควบคุมปั๊มน้ำ</div>
-          <div className="text-sm text-gray-500">สั่งงานปั๊ม + ดูประวัติการให้น้ำ</div>
+          <div className="text-2xl font-bold text-gray-900">ควบคุมการรดน้ำ</div>
+          <div className="text-sm text-gray-500">สั่งรดน้ำผักบุ้ง และดูประวัติการรดน้ำ</div>
         </div>
-        <Button variant="outline" onClick={loadLogs} disabled={loadingLog}>
+        <Button variant="outline" onClick={loadAll} disabled={loadingLog}>
           รีเฟรชประวัติ
         </Button>
       </div>
@@ -110,14 +169,14 @@ export default function ControlPump() {
       <Card className="p-5">
         <div className="flex flex-col lg:flex-row gap-5 lg:items-end lg:justify-between">
           <div className="flex-1">
-            <div className="text-lg font-semibold text-gray-900">ส่งคำสั่ง</div>
+            <div className="text-lg font-semibold text-gray-900">สั่งปั๊มรดน้ำ</div>
             <div className="text-sm text-gray-500 mt-1">
-              ระบบจะบันทึกคำสั่งไว้ในฐานข้อมูล (ยังไม่ต้องมีเซนเซอร์จริง)
+              ระบบจะบันทึกคำสั่งไว้ในฐานข้อมูลเพื่อดูย้อนหลัง
             </div>
 
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <div className="text-sm text-gray-600 mb-1">ระยะเวลา (วินาที)</div>
+                <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที)</div>
                 <Input
                   type="number"
                   min={1}
@@ -131,10 +190,16 @@ export default function ControlPump() {
 
               <div className="flex gap-2 sm:justify-end sm:items-end">
                 <Button onClick={() => sendCommand("ON")} disabled={busy} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "เปิดปั๊ม"}
+                  {busy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
                 </Button>
                 <Button variant="danger" onClick={() => sendCommand("OFF")} disabled={busy} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "ปิดปั๊ม"}
+                  {busy ? "กำลังส่ง..." : "หยุดรดน้ำ"}
+                </Button>
+                <Button variant="outline" onClick={pausePump} disabled={pauseBusy} className="w-full sm:w-auto">
+                  {pauseBusy ? "กำลังส่ง..." : "พักระบบรดน้ำ"}
+                </Button>
+                <Button variant="outline" onClick={resumePump} disabled={pauseBusy} className="w-full sm:w-auto">
+                  {pauseBusy ? "กำลังส่ง..." : "ทำงานต่อ"}
                 </Button>
               </div>
             </div>
@@ -142,11 +207,11 @@ export default function ControlPump() {
 
           <div className="lg:w-[360px]">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="font-semibold text-emerald-900">คำแนะนำ</div>
+              <div className="font-semibold text-emerald-900">คำแนะนำสำหรับผักบุ้ง</div>
               <ul className="mt-2 text-sm text-emerald-800 list-disc pl-5 space-y-1">
-                <li>ปุ่มจะถูกปิดชั่วคราวระหว่างกำลังส่ง เพื่อกันกดซ้ำ</li>
-                <li>ถ้าต้องการ “กัน spam” แนะนำทำ rate-limit ที่ backend</li>
-                <li>ดูประวัติคำสั่งด้านล่างได้เลย</li>
+                <li>ผักบุ้งชอบดินชื้นสม่ำเสมอ แนะนำรดเป็นช่วงสั้น ๆ แต่ต่อเนื่อง</li>
+                <li>หากดินชื้นมากให้เว้นช่วงรดน้ำเพื่อกันน้ำขัง</li>
+                <li>ดูประวัติการรดน้ำด้านล่างได้เลย</li>
               </ul>
             </div>
           </div>
@@ -155,8 +220,19 @@ export default function ControlPump() {
 
       <Card className="p-5">
         <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold text-gray-900">ประวัติการให้น้ำ</div>
-          <Badge variant="gray">Watering Logs</Badge>
+          <div className="text-lg font-semibold text-gray-900">ประวัติการรดน้ำ</div>
+          <Badge variant="gray">บันทึกการรดน้ำ</Badge>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2 items-center">
+          <Button variant="outline" onClick={toggleAutoSoil} disabled={autoBusy || !settings}>
+            {autoBusy
+              ? "กำลังอัปเดต..."
+              : settings?.auto_soil_enabled
+                ? "ปิดรดน้ำอัตโนมัติ (ตามความชื้นดิน)"
+                : "เปิดรดน้ำอัตโนมัติ (ตามความชื้นดิน)"}
+          </Button>
+          {settings?.pump_paused ? <Badge variant="yellow">ปั๊มถูกพักชั่วคราว</Badge> : null}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 items-center">

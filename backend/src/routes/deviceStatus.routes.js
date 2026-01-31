@@ -21,6 +21,7 @@ async function ensureFarmSetting(farm_id, device_key) {
         // Pump settings
         watering_duration_sec: 10,
         watering_cooldown_min: 30,
+        pump_paused: true,
 
         // Schedule settings
         watering_schedule_enabled: false,

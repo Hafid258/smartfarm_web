@@ -1,8 +1,9 @@
 // frontend/src/services/api.js
 import axios from "axios";
+import { loadRuntimeConfig, getApiBaseFallback } from "./runtimeConfig.js";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
+  baseURL: getApiBaseFallback(),
   timeout: 15000,
 });
 
@@ -76,3 +77,12 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+
+export async function initApiBase() {
+  const cfg = await loadRuntimeConfig();
+  if (cfg && cfg.api_base) {
+    api.defaults.baseURL = String(cfg.api_base).trim();
+  }
+  return api.defaults.baseURL;
+}

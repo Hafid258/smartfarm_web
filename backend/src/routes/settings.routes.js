@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import { requireAuth } from "../middleware/auth.js";
 import { resolveFarmId } from "../middleware/resolveFarmId.js";
 import FarmSetting from "../models/FarmSetting.js";
@@ -35,6 +36,12 @@ function normalizeSchedules(schedules) {
   }));
 }
 
+function pickValue(incoming, current, fallback) {
+  if (incoming !== undefined) return incoming;
+  if (current !== undefined) return current;
+  return fallback;
+}
+
 // GET /api/settings/my
 router.get("/my", async (req, res) => {
   try {
@@ -54,20 +61,47 @@ router.post("/my", async (req, res) => {
     const farm_id = req.farmId;
     if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
 
+    const existing = await FarmSetting.findOne({ farm_id }).lean();
+    const incomingKey = String(req.body.device_key || "").trim();
+    const device_key =
+      incomingKey ||
+      String(existing?.device_key || "").trim() ||
+      crypto.randomBytes(12).toString("hex");
+
     const payload = {
-      device_key: String(req.body.device_key || ""),
+      device_key,
 
-      pump_flow_rate_lpm: Number(req.body.pump_flow_rate_lpm || 0),
+      pump_flow_rate_lpm: Number(
+        pickValue(req.body.pump_flow_rate_lpm, existing?.pump_flow_rate_lpm, 0)
+      ),
 
-      auto_soil_enabled: Boolean(req.body.auto_soil_enabled),
-      auto_soil_start_at: Number(req.body.auto_soil_start_at || 35),
-      auto_soil_stop_at: Number(req.body.auto_soil_stop_at || 50),
-      watering_duration_sec: Number(req.body.watering_duration_sec || 30),
-      watering_cooldown_min: Number(req.body.watering_cooldown_min || 5),
+      auto_soil_enabled: Boolean(
+        pickValue(req.body.auto_soil_enabled, existing?.auto_soil_enabled, false)
+      ),
+      auto_soil_start_at: Number(
+        pickValue(req.body.auto_soil_start_at, existing?.auto_soil_start_at, 35)
+      ),
+      auto_soil_stop_at: Number(
+        pickValue(req.body.auto_soil_stop_at, existing?.auto_soil_stop_at, 50)
+      ),
+      watering_duration_sec: Number(
+        pickValue(req.body.watering_duration_sec, existing?.watering_duration_sec, 30)
+      ),
+      watering_cooldown_min: Number(
+        pickValue(req.body.watering_cooldown_min, existing?.watering_cooldown_min, 5)
+      ),
+      pump_paused: Boolean(
+        pickValue(req.body.pump_paused, existing?.pump_paused, false)
+      ),
 
-      watering_schedules: normalizeSchedules(req.body.watering_schedules),
+      watering_schedules:
+        req.body.watering_schedules !== undefined
+          ? normalizeSchedules(req.body.watering_schedules)
+          : normalizeSchedules(existing?.watering_schedules),
 
-      sampling_interval_min: Number(req.body.sampling_interval_min || 5),
+      sampling_interval_min: Number(
+        pickValue(req.body.sampling_interval_min, existing?.sampling_interval_min, 5)
+      ),
 
       updated_by: req.user?._id,
       updated_at: new Date(),

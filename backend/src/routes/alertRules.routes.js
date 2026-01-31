@@ -26,7 +26,7 @@ router.get("/", resolveFarmId, async (req, res) => {
 router.post("/", resolveFarmId, async (req, res) => {
   try {
     const farm_id = req.farmId;
-    const { metric, operator, threshold, message, enabled } = req.body;
+    const { metric, operator, threshold, message, enabled, action, duration_sec } = req.body;
 
     if (!metric || !operator || threshold === undefined || !message) {
       return res.status(400).json({ error: "metric, operator, threshold, message are required" });
@@ -39,6 +39,8 @@ router.post("/", resolveFarmId, async (req, res) => {
       threshold: Number(threshold),
       message: String(message),
       enabled: enabled !== undefined ? Boolean(enabled) : true,
+      action: action || "none",
+      duration_sec: duration_sec !== undefined ? Number(duration_sec) : null,
     });
 
     res.json({ ok: true, rule });
@@ -57,7 +59,7 @@ router.put("/:id", resolveFarmId, async (req, res) => {
     const farm_id = req.farmId;
     const { id } = req.params;
 
-    const { metric, operator, threshold, message, enabled } = req.body;
+    const { metric, operator, threshold, message, enabled, action, duration_sec } = req.body;
 
     const rule = await FarmAlertRule.findOneAndUpdate(
       { _id: id, farm_id },
@@ -68,6 +70,8 @@ router.put("/:id", resolveFarmId, async (req, res) => {
           threshold: threshold !== undefined ? Number(threshold) : undefined,
           message,
           enabled: enabled !== undefined ? Boolean(enabled) : undefined,
+          action: action !== undefined ? action : undefined,
+          duration_sec: duration_sec !== undefined ? Number(duration_sec) : undefined,
         },
       },
       { new: true }

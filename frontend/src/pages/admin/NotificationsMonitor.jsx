@@ -101,6 +101,16 @@ export default function NotificationsMonitor() {
     }
   }
 
+  async function quickWater(n) {
+    try {
+      const duration = Number(n.recommended_duration_sec || 30);
+      await api.post("/device/command", { command: "ON", duration_sec: duration });
+      toast.success(`ส่งคำสั่งรดน้ำ ${duration} วิ สำเร็จ`);
+    } catch (e) {
+      toast.error(e?.response?.data?.error || e.message || "ส่งคำสั่งไม่สำเร็จ");
+    }
+  }
+
   // ✅ ส่ง Discord test (เลือก user ได้)
   async function sendDiscordTest() {
     try {
@@ -135,8 +145,8 @@ export default function NotificationsMonitor() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">Notifications Monitor</div>
-          <div className="text-sm text-gray-500">มอนิเตอร์แจ้งเตือน + ทดสอบส่ง Discord</div>
+          <div className="text-2xl font-bold text-gray-900">ศูนย์แจ้งเตือน</div>
+          <div className="text-sm text-gray-500">ติดตามแจ้งเตือนและทดสอบส่ง Discord</div>
         </div>
 
         {/* Controls */}
@@ -148,7 +158,7 @@ export default function NotificationsMonitor() {
             onChange={(e) => setFarmId(e.target.value)}
           >
             {farms.length === 0 ? (
-              <option value="">No farms</option>
+              <option value="">ไม่มีฟาร์ม</option>
             ) : (
               farms.map((f) => (
                 <option key={f._id} value={f._id}>
@@ -165,7 +175,7 @@ export default function NotificationsMonitor() {
             onChange={(e) => setTargetUserId(e.target.value)}
             title="เลือก user เพื่อทดสอบส่ง Discord"
           >
-            <option value="">ส่งไป Discord ของฉัน (Admin)</option>
+            <option value="">ส่งไป Discord ของฉัน (ผู้ดูแล)</option>
             {users.map((u) => (
               <option key={u._id} value={u._id}>
                 {u.username} ({u.role})
@@ -190,7 +200,7 @@ export default function NotificationsMonitor() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหา alert/details/severity..."
+              placeholder="ค้นหา ประเภท/รายละเอียด/ระดับความรุนแรง..."
             />
           </div>
 
@@ -206,7 +216,7 @@ export default function NotificationsMonitor() {
               {onlyUnread ? "เฉพาะยังไม่อ่าน" : "ทั้งหมด"}
             </button>
 
-            <Badge variant="gray">{filtered.length} items</Badge>
+            <Badge variant="gray">{filtered.length} รายการ</Badge>
           </div>
         </div>
 
@@ -248,6 +258,7 @@ export default function NotificationsMonitor() {
             {filtered.map((n) => {
               const sev = n.severity || "low";
               const sevBadge = sev === "high" ? "red" : sev === "medium" ? "yellow" : "gray";
+              const sevText = sev === "high" ? "สูง" : sev === "medium" ? "กลาง" : "ต่ำ";
 
               return (
                 <div
@@ -259,9 +270,9 @@ export default function NotificationsMonitor() {
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-semibold text-gray-900">{n.alert_type || "Notification"}</div>
-                        <Badge variant={sevBadge}>{sev}</Badge>
-                        {!n.is_read ? <Badge variant="green">NEW</Badge> : <Badge variant="gray">read</Badge>}
+                        <div className="font-semibold text-gray-900">{n.alert_type || "แจ้งเตือน"}</div>
+                        <Badge variant={sevBadge}>{sevText}</Badge>
+                        {!n.is_read ? <Badge variant="green">ใหม่</Badge> : <Badge variant="gray">อ่านแล้ว</Badge>}
                       </div>
 
                       <div className="text-sm text-gray-700 mt-2 break-words">{n.details || "-"}</div>
@@ -272,6 +283,11 @@ export default function NotificationsMonitor() {
                     </div>
 
                     <div className="shrink-0 flex gap-2">
+                      {n.recommended_action === "water" ? (
+                        <Button variant="outline" onClick={() => quickWater(n)}>
+                          รดน้ำ {n.recommended_duration_sec || 30} วิ
+                        </Button>
+                      ) : null}
                       {!n.is_read && (
                         <Button variant="outline" onClick={() => markRead(n._id)}>
                           อ่านแล้ว
