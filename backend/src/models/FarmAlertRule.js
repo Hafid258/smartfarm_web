@@ -32,7 +32,7 @@ const FarmAlertRuleSchema = new mongoose.Schema(
     enabled: { type: Boolean, default: true },
 
     // optional action
-    action: { type: String, enum: ["none", "water"], default: "none" },
+    action: { type: String, enum: ["none", "water", "mist"], default: "none" },
     duration_sec: { type: Number, default: null },
   },
   { timestamps: true }

@@ -218,6 +218,9 @@ async function maybeNotifyAlertRules({ farm_id, metrics }) {
     }
 
     const details = `${rule.message} (ค่า=${Number(value).toFixed(2)})`;
+    const action = rule.action === "water" || rule.action === "mist" ? rule.action : "";
+    const recommendedDuration =
+      action ? clampNum(Number(rule.duration_sec ?? 30), 1, 3600) : null;
 
     if (farmObjectId) {
       await Notification.create({
@@ -229,8 +232,8 @@ async function maybeNotifyAlertRules({ farm_id, metrics }) {
         sent_to: "system",
         sent_status: "success",
         rule_id: rule._id,
-        recommended_action: rule.action === "water" ? "water" : "",
-        recommended_duration_sec: rule.action === "water" ? rule.duration_sec ?? null : null,
+        recommended_action: action,
+        recommended_duration_sec: recommendedDuration,
       });
     }
   }
@@ -440,12 +443,16 @@ secured.post("/command", async (req, res) => {
 
     const { command, duration_sec } = req.body;
     if (!command) return res.status(400).json({ error: "command required" });
+    const device_id = String(req.body.device_id || "pump").trim().toLowerCase();
+    if (!["pump", "mist"].includes(device_id)) {
+      return res.status(400).json({ error: "device_id must be pump or mist" });
+    }
 
     const storeFarmId = farmIdForStore(farm_id);
 
     const doc = await DeviceCommand.create({
       farm_id: storeFarmId,
-      device_id: req.body.device_id || "pump",
+      device_id,
       command,
       duration_sec: duration_sec ? Number(duration_sec) : undefined,
       status: "pending",
@@ -477,6 +484,56 @@ secured.get("/commands", async (req, res) => {
   } catch (err) {
     console.error("DEVICE LOG ERROR:", err);
     res.status(500).json({ error: err?.message || "Failed to fetch device commands" });
+  }
+});
+
+// POST /api/device/commands/cancel-all
+secured.post("/commands/cancel-all", async (req, res) => {
+  try {
+    const farm_id = req.farmId;
+    if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
+
+    const storeFarmId = farmIdForStore(farm_id);
+    const now = new Date();
+
+    const pendingFilter = { ...farmQueryAnyType(farm_id), status: "pending" };
+    const pendingCount = await DeviceCommand.countDocuments(pendingFilter);
+
+    await DeviceCommand.updateMany(
+      pendingFilter,
+      { $set: { status: "failed", completed_at: now } }
+    );
+
+    const source = req.user?.role || "user";
+    await DeviceCommand.create([
+      {
+        farm_id: storeFarmId,
+        device_id: "pump",
+        command: "OFF",
+        duration_sec: 0,
+        status: "pending",
+        source,
+        timestamp: now,
+      },
+      {
+        farm_id: storeFarmId,
+        device_id: "mist",
+        command: "OFF",
+        duration_sec: 0,
+        status: "pending",
+        source,
+        timestamp: now,
+      },
+    ]);
+
+    res.json({
+      ok: true,
+      canceled_pending: pendingCount,
+      queued_stop: ["pump", "mist"],
+    });
+  } catch (err) {
+    console.error("DEVICE CANCEL ALL ERROR:", err);
+    res.status(500).json({ error: err?.message || "Failed to cancel commands" });
   }
 });
 

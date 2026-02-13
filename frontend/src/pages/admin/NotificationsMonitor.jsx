@@ -7,6 +7,20 @@ import Badge from "../../components/ui/Badge.jsx";
 import Spinner from "../../components/ui/Spinner.jsx";
 import { useToast } from "../../components/ui/ToastProvider.jsx";
 
+function explainAlertType(type) {
+  const t = String(type || "").toLowerCase();
+  if (t.startsWith("sensor_zero_")) {
+    return "ระบบพบค่าจากเซนเซอร์เป็น 0 ซ้ำหลายครั้ง อาจมีปัญหาที่เซนเซอร์หรือการเชื่อมต่อ";
+  }
+  if (t.startsWith("rule_")) {
+    return "ค่านี้เข้าเงื่อนไขกฎแจ้งเตือนที่ตั้งไว้ในระบบ";
+  }
+  if (!t) {
+    return "การแจ้งเตือนจากระบบสมาร์ตฟาร์ม";
+  }
+  return "การแจ้งเตือนจากระบบสมาร์ตฟาร์ม โปรดตรวจสอบข้อมูลและอุปกรณ์";
+}
+
 export default function NotificationsMonitor() {
   const toast = useToast();
 
@@ -101,11 +115,18 @@ export default function NotificationsMonitor() {
     }
   }
 
-  async function quickWater(n) {
+  async function quickAction(n) {
     try {
       const duration = Number(n.recommended_duration_sec || 30);
-      await api.post("/device/command", { command: "ON", duration_sec: duration });
-      toast.success(`ส่งคำสั่งรดน้ำ ${duration} วิ สำเร็จ`);
+      const deviceId = n.recommended_action === "mist" ? "mist" : "pump";
+      await api.post("/device/command", {
+        command: "ON",
+        device_id: deviceId,
+        duration_sec: duration,
+      });
+      toast.success(
+        `ส่งคำสั่ง${deviceId === "mist" ? "พ่นหมอก" : "รดน้ำ"} ${duration} วิ สำเร็จ`
+      );
     } catch (e) {
       toast.error(e?.response?.data?.error || e.message || "ส่งคำสั่งไม่สำเร็จ");
     }
@@ -195,6 +216,27 @@ export default function NotificationsMonitor() {
 
       {/* Search + Filter + Discord message */}
       <Card className="p-5">
+        <div className="text-base font-semibold text-gray-900">คำอธิบายแบบเข้าใจง่าย</div>
+        <div className="mt-2 text-sm text-gray-700 leading-relaxed">
+          หน้านี้ใช้ดูว่าแปลงของคุณมีความเสี่ยงอะไร และสั่งการได้ทันทีเมื่อจำเป็น
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3 text-sm">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
+            <b>ระดับสูง</b>: ควรรีบตรวจสอบทันที
+          </div>
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-yellow-800">
+            <b>ระดับกลาง</b>: ควรติดตามใกล้ชิด
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-gray-700">
+            <b>ระดับต่ำ</b>: แจ้งเพื่อเฝ้าดูแนวโน้ม
+          </div>
+        </div>
+        <div className="mt-3 text-sm text-gray-700">
+          ปุ่ม <b>รดน้ำ/พ่นหมอก</b> คือคำสั่งด่วนตามคำแนะนำของระบบ และปุ่ม <b>อ่านแล้ว</b> ใช้เก็บงานที่ตรวจสอบแล้ว
+        </div>
+      </Card>
+
+      <Card className="p-5">
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
           <div className="flex-1">
             <Input
@@ -276,6 +318,9 @@ export default function NotificationsMonitor() {
                       </div>
 
                       <div className="text-sm text-gray-700 mt-2 break-words">{n.details || "-"}</div>
+                      <div className="text-xs text-gray-500 mt-2 leading-relaxed">
+                        {explainAlertType(n.alert_type)}
+                      </div>
 
                       <div className="text-xs text-gray-400 mt-2">
                         {n.timestamp ? new Date(n.timestamp).toLocaleString() : "-"}
@@ -283,9 +328,10 @@ export default function NotificationsMonitor() {
                     </div>
 
                     <div className="shrink-0 flex gap-2">
-                      {n.recommended_action === "water" ? (
-                        <Button variant="outline" onClick={() => quickWater(n)}>
-                          รดน้ำ {n.recommended_duration_sec || 30} วิ
+                      {n.recommended_action === "water" || n.recommended_action === "mist" ? (
+                        <Button variant="outline" onClick={() => quickAction(n)}>
+                          {n.recommended_action === "mist" ? "พ่นหมอก" : "รดน้ำ"}{" "}
+                          {n.recommended_duration_sec || 30} วิ
                         </Button>
                       ) : null}
                       {!n.is_read && (

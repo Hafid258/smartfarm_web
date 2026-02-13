@@ -42,7 +42,7 @@ export default function AlertRules() {
   const [operator, setOperator] = useState("gt");
   const [threshold, setThreshold] = useState("");
   const [message, setMessage] = useState("");
-  const [actionWater, setActionWater] = useState(false);
+  const [actionType, setActionType] = useState("none");
   const [actionDuration, setActionDuration] = useState(30);
 
   // ✅ แก้ไข rule
@@ -93,7 +93,7 @@ export default function AlertRules() {
     setOperator("gt");
     setThreshold("");
     setMessage("");
-    setActionWater(false);
+    setActionType("none");
     setActionDuration(30);
   };
 
@@ -111,8 +111,8 @@ export default function AlertRules() {
         threshold: Number(threshold),
         message: message.trim(),
         enabled: true,
-        action: actionWater ? "water" : "none",
-        duration_sec: actionWater ? Number(actionDuration || 30) : null,
+        action: actionType,
+        duration_sec: actionType !== "none" ? Number(actionDuration || 30) : null,
       });
 
       toast.success("สร้างกฎสำเร็จ ✅");
@@ -187,7 +187,9 @@ export default function AlertRules() {
         enabled: editForm.enabled,
         action: editForm.action || "none",
         duration_sec:
-          editForm.action === "water" ? Number(editForm.duration_sec || 30) : null,
+          editForm.action && editForm.action !== "none"
+            ? Number(editForm.duration_sec || 30)
+            : null,
       });
 
       toast.success("แก้ไขสำเร็จ ✅");
@@ -300,16 +302,20 @@ export default function AlertRules() {
           </div>
 
           <div className="md:col-span-4 flex flex-wrap gap-3 items-center">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={actionWater}
-                onChange={(e) => setActionWater(e.target.checked)}
-              />
-              แนะนำให้รดน้ำเมื่อเข้าเงื่อนไข
-            </label>
+            <div className="flex items-center gap-2 text-sm">
+              <span>แนะนำการทำงานเมื่อเข้าเงื่อนไข</span>
+              <select
+                className="border rounded-xl px-3 py-2 text-sm bg-white"
+                value={actionType}
+                onChange={(e) => setActionType(e.target.value)}
+              >
+                <option value="none">ไม่ต้องสั่งงานอุปกรณ์</option>
+                <option value="water">รดน้ำ</option>
+                <option value="mist">พ่นหมอก</option>
+              </select>
+            </div>
 
-            {actionWater ? (
+            {actionType !== "none" ? (
               <div className="flex items-center gap-2 text-sm">
                 <span>ระยะเวลา (วินาที)</span>
                 <Input
@@ -359,9 +365,13 @@ export default function AlertRules() {
                         </span>
                       </div>
 
-                      <div className="text-sm text-gray-700 mt-1">
-                        📢 {r.message}
-                      </div>
+                      <div className="text-sm text-gray-700 mt-1">📢 {r.message}</div>
+                      {r.action && r.action !== "none" ? (
+                        <div className="text-xs text-gray-500 mt-1">
+                          แนะนำการทำงาน: {r.action === "water" ? "รดน้ำ" : "พ่นหมอก"}{" "}
+                          {r.duration_sec ? `${r.duration_sec} วินาที` : ""}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="flex gap-2">
@@ -451,21 +461,25 @@ export default function AlertRules() {
                       </div>
 
                       <div className="md:col-span-4 flex flex-wrap gap-3 items-center">
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editForm.action === "water"}
+                        <div className="flex items-center gap-2 text-sm">
+                          <span>แนะนำการทำงานเมื่อเข้าเงื่อนไข</span>
+                          <select
+                            className="border rounded-xl px-3 py-2 text-sm bg-white"
+                            value={editForm.action || "none"}
                             onChange={(e) =>
                               setEditForm((p) => ({
                                 ...p,
-                                action: e.target.checked ? "water" : "none",
+                                action: e.target.value,
                               }))
                             }
-                          />
-                          แนะนำให้รดน้ำเมื่อเข้าเงื่อนไข
-                        </label>
+                          >
+                            <option value="none">ไม่ต้องสั่งงานอุปกรณ์</option>
+                            <option value="water">รดน้ำ</option>
+                            <option value="mist">พ่นหมอก</option>
+                          </select>
+                        </div>
 
-                        {editForm.action === "water" ? (
+                        {editForm.action && editForm.action !== "none" ? (
                           <div className="flex items-center gap-2 text-sm">
                             <span>ระยะเวลา (วินาที)</span>
                             <Input

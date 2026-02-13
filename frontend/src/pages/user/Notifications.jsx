@@ -96,11 +96,18 @@ export default function Notifications() {
     }
   }
 
-  async function quickWater(n) {
+  async function quickAction(n) {
     try {
       const duration = Number(n.recommended_duration_sec || 30);
-      await api.post("/device/command", { command: "ON", duration_sec: duration });
-      toast.success(`ส่งคำสั่งรดน้ำ ${duration} วิ สำเร็จ`);
+      const deviceId = n.recommended_action === "mist" ? "mist" : "pump";
+      await api.post("/device/command", {
+        command: "ON",
+        device_id: deviceId,
+        duration_sec: duration,
+      });
+      toast.success(
+        `ส่งคำสั่ง${deviceId === "mist" ? "พ่นหมอก" : "รดน้ำ"} ${duration} วิ สำเร็จ`
+      );
     } catch (e) {
       toast.error(e.message || "ส่งคำสั่งไม่สำเร็จ");
     }
@@ -222,9 +229,10 @@ export default function Notifications() {
                     </div>
 
                     <div className="shrink-0 flex gap-2">
-                      {n.recommended_action === "water" ? (
-                        <Button variant="outline" onClick={() => quickWater(n)}>
-                          รดน้ำ {n.recommended_duration_sec || 30} วิ
+                      {n.recommended_action === "water" || n.recommended_action === "mist" ? (
+                        <Button variant="outline" onClick={() => quickAction(n)}>
+                          {n.recommended_action === "mist" ? "พ่นหมอก" : "รดน้ำ"}{" "}
+                          {n.recommended_duration_sec || 30} วิ
                         </Button>
                       ) : null}
                       {!n.is_read && (

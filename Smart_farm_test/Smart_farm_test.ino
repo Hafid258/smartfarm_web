@@ -103,10 +103,16 @@ unsigned long pumpStopAtMs = 0;
 unsigned long pumpStartedAtMs = 0;
 bool pumpPaused = false;
 unsigned long pausedRemainingSec = 0;
+String pendingPumpOnCommandId = "";
+
+// Mist runtime
+bool mistRunning = false;
+unsigned long mistStopAtMs = 0;
+unsigned long mistStartedAtMs = 0;
+String pendingMistOnCommandId = "";
 
 // MANUAL tracking
 bool manualActive = false;          // true เมื่อมีคำสั่งจากเว็บ / กำลังรันตามคำสั่ง
-String pendingOnCommandId = "";
 String lastCommandId = "";          // กันรันซ้ำ
 bool autoEnabled = false;           // เริ่มต้นปิด AUTO จนกว่าจะมีคำสั่งจากเว็บ
 unsigned long lastAckTryMs = 0;
@@ -301,6 +307,13 @@ void ensureWiFi() {
     pumpRunning = false;
     pumpStopAtMs = 0;
   }
+  if (mistRunning) {
+    stopMist();
+  } else {
+    relayWrite(RELAY2_PIN, false);
+    mistRunning = false;
+    mistStopAtMs = 0;
+  }
 
   Serial.printf("Connecting WiFi: %s\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
@@ -342,6 +355,26 @@ void handlePumpAutoStop() {
   if (pumpRunning && pumpStopAtMs > 0 && millis() >= pumpStopAtMs) stopPump();
 }
 
+void startMistForSeconds(int sec) {
+  sec = clampInt(sec, 1, 3600);
+  relayWrite(RELAY2_PIN, true);
+  mistRunning = true;
+  mistStartedAtMs = millis();
+  mistStopAtMs = millis() + (unsigned long)sec * 1000UL;
+  Serial.printf("Mist ON for %d sec\n", sec);
+}
+
+void stopMist() {
+  relayWrite(RELAY2_PIN, false);
+  mistRunning = false;
+  mistStopAtMs = 0;
+  Serial.println("Mist OFF");
+}
+
+void handleMistAutoStop() {
+  if (mistRunning && mistStopAtMs > 0 && millis() >= mistStopAtMs) stopMist();
+}
+
 // ------------------ API Actions ------------------
 void testHealth() {
   // ปิดการเรียก /health ฝั่ง ESP32 ชั่วคราว
@@ -358,6 +391,7 @@ void sendStatus() {
   doc["ip"] = WiFi.localIP().toString();
   doc["wifi_rssi"] = WiFi.RSSI();
   doc["pump_state"] = pumpRunning ? "ON" : "OFF";
+  doc["mist_state"] = mistRunning ? "ON" : "OFF";
   doc["fw_version"] = "v1.1.1"; // ✅ bump
   doc["uptime_sec"] = (int)(millis() / 1000UL);
 
@@ -413,6 +447,7 @@ void sendSensor() {
   }
 
   doc["pump_running"] = pumpRunning;
+  doc["mist_running"] = mistRunning;
   doc["mode"] = manualActive ? "MANUAL" : "AUTO";
 
   String payload;
@@ -420,11 +455,12 @@ void sendSensor() {
 
   httpPostJson(EP_SENSOR, payload);
 
-  Serial.printf("SOIL=%d%% adc=%d | LUX=%s | MODE=%s | PUMP=%s | BH=%s\n",
+  Serial.printf("SOIL=%d%% adc=%d | LUX=%s | MODE=%s | PUMP=%s | MIST=%s | BH=%s\n",
     soilPct, soilADC,
     luxOk ? String(lux, 0).c_str() : "N/A",
     manualActive ? "MANUAL" : "AUTO",
     pumpRunning ? "ON" : "OFF",
+    mistRunning ? "ON" : "OFF",
     bhOk ? "OK" : "FAIL"
   );
 }
@@ -464,6 +500,7 @@ void pollCommands() {
 
   const char* id  = doc["_id"] | "";
   const char* cmd = doc["command"] | "";
+  const char* deviceIdRaw = doc["device_id"] | "pump";
   int duration = doc["duration_sec"] | 0;
 
   if (strlen(id) == 0 || strlen(cmd) == 0) return;
@@ -472,70 +509,113 @@ void pollCommands() {
   lastCommandId = String(id);
 
   String cmdStr = String(cmd);
-  Serial.printf("Got command: %s id=%s duration=%d\n", cmdStr.c_str(), id, duration);
+  String deviceId = String(deviceIdRaw);
+  if (deviceId.length() == 0) deviceId = "pump";
+  Serial.printf("Got command: %s device=%s id=%s duration=%d\n", cmdStr.c_str(), deviceId.c_str(), id, duration);
 
-  if (cmdStr == "ON") {
-    manualActive = true;
-    autoEnabled = true; // ได้รับคำสั่งแล้ว เปิด AUTO ได้
-    pumpPaused = false;
-    pausedRemainingSec = 0;
-    if (!pumpRunning) {
-      pendingOnCommandId = id;
-      startPumpForSeconds(duration > 0 ? duration : 30);
-    }
-  } else if (cmdStr == "OFF") {
-    manualActive = false;
-    stopPump();
-    pumpPaused = false;
-    pausedRemainingSec = 0;
-    if (pendingOnCommandId.length() > 0) {
-      sendAck(pendingOnCommandId.c_str(), "failed", 0);
-      pendingOnCommandId = "";
-      pumpStartedAtMs = 0;
-    }
-    autoEnabled = true; // ได้รับคำสั่งแล้ว เปิด AUTO ได้
-    sendAck(id, "done", 0);
-  } else if (cmdStr == "PAUSE") {
-    if (pumpRunning) {
-      unsigned long remainMs = pumpStopAtMs > millis() ? (pumpStopAtMs - millis()) : 0;
-      pausedRemainingSec = (remainMs + 999) / 1000UL;
-      stopPump();
-      pumpPaused = true;
-    }
-    sendAck(id, "done", 0);
-  } else if (cmdStr == "RESUME") {
-    if (pumpPaused && pausedRemainingSec > 0) {
-      startPumpForSeconds((int)pausedRemainingSec);
+  if (deviceId == "pump") {
+    if (cmdStr == "ON") {
+      manualActive = true;
+      autoEnabled = true; // ได้รับคำสั่งแล้ว เปิด AUTO ได้
       pumpPaused = false;
       pausedRemainingSec = 0;
+      if (!pumpRunning) {
+        pendingPumpOnCommandId = id;
+        startPumpForSeconds(duration > 0 ? duration : 30);
+      } else {
+        sendAck(id, "done", 0);
+      }
+    } else if (cmdStr == "OFF") {
+      manualActive = false;
+      stopPump();
+      pumpPaused = false;
+      pausedRemainingSec = 0;
+      if (pendingPumpOnCommandId.length() > 0) {
+        sendAck(pendingPumpOnCommandId.c_str(), "failed", 0);
+        pendingPumpOnCommandId = "";
+        pumpStartedAtMs = 0;
+      }
+      autoEnabled = true; // ได้รับคำสั่งแล้ว เปิด AUTO ได้
+      sendAck(id, "done", 0);
+    } else if (cmdStr == "PAUSE") {
+      if (pumpRunning) {
+        unsigned long remainMs = pumpStopAtMs > millis() ? (pumpStopAtMs - millis()) : 0;
+        pausedRemainingSec = (remainMs + 999) / 1000UL;
+        stopPump();
+        pumpPaused = true;
+      }
+      sendAck(id, "done", 0);
+    } else if (cmdStr == "RESUME") {
+      if (pumpPaused && pausedRemainingSec > 0) {
+        startPumpForSeconds((int)pausedRemainingSec);
+        pumpPaused = false;
+        pausedRemainingSec = 0;
+      }
+      sendAck(id, "done", 0);
+    } else {
+      sendAck(id, "failed", 0);
     }
-    sendAck(id, "done", 0);
-  } else {
-    sendAck(id, "failed", 0);
+    return;
   }
+
+  if (deviceId == "mist") {
+    if (cmdStr == "ON") {
+      if (!mistRunning) {
+        pendingMistOnCommandId = id;
+        startMistForSeconds(duration > 0 ? duration : 30);
+      } else {
+        sendAck(id, "done", 0);
+      }
+    } else if (cmdStr == "OFF") {
+      stopMist();
+      if (pendingMistOnCommandId.length() > 0) {
+        sendAck(pendingMistOnCommandId.c_str(), "failed", 0);
+        pendingMistOnCommandId = "";
+        mistStartedAtMs = 0;
+      }
+      sendAck(id, "done", 0);
+    } else {
+      sendAck(id, "failed", 0);
+    }
+    return;
+  }
+
+  sendAck(id, "failed", 0);
 }
 
 void ackIfOnFinished() {
-  if (pendingOnCommandId.length() == 0) return;
-  if (pumpRunning) return;
   if (!netAllowed()) return;
 
   unsigned long now = millis();
   if (now - lastAckTryMs < ACK_RETRY_MS) return;
   lastAckTryMs = now;
 
-  unsigned long durMs = 0;
-  if (pumpStartedAtMs > 0) durMs = millis() - pumpStartedAtMs;
-  int actualSec = (int)(durMs / 1000UL);
-  if (actualSec <= 0) actualSec = 1;
+  if (!pumpRunning && pendingPumpOnCommandId.length() > 0) {
+    unsigned long durMs = 0;
+    if (pumpStartedAtMs > 0) durMs = millis() - pumpStartedAtMs;
+    int actualSec = (int)(durMs / 1000UL);
+    if (actualSec <= 0) actualSec = 1;
 
-  bool ok = sendAck(pendingOnCommandId.c_str(), "done", actualSec);
-  if (!ok) return;
+    bool ok = sendAck(pendingPumpOnCommandId.c_str(), "done", actualSec);
+    if (ok) {
+      pendingPumpOnCommandId = "";
+      pumpStartedAtMs = 0;
+      manualActive = false;
+    }
+  }
 
-  pendingOnCommandId = "";
-  pumpStartedAtMs = 0;
+  if (!mistRunning && pendingMistOnCommandId.length() > 0) {
+    unsigned long durMs = 0;
+    if (mistStartedAtMs > 0) durMs = millis() - mistStartedAtMs;
+    int actualSec = (int)(durMs / 1000UL);
+    if (actualSec <= 0) actualSec = 1;
 
-  manualActive = false;
+    bool ok = sendAck(pendingMistOnCommandId.c_str(), "done", actualSec);
+    if (ok) {
+      pendingMistOnCommandId = "";
+      mistStartedAtMs = 0;
+    }
+  }
 }
 
 // ------------------ AUTO logic ------------------
@@ -603,6 +683,7 @@ void loop() {
   ensureWiFi();
 
   handlePumpAutoStop();
+  handleMistAutoStop();
   ackIfOnFinished();
   // autoWateringStep(); // disable auto watering for now
 

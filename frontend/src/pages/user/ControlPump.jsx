@@ -36,6 +36,7 @@ export default function ControlPump() {
   const [err, setErr] = useState("");
 
   const [duration, setDuration] = useState(10); // seconds
+  const [mistDuration, setMistDuration] = useState(10); // seconds
   const [logs, setLogs] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [settings, setSettings] = useState(null);
@@ -86,15 +87,22 @@ export default function ControlPump() {
     return logs.filter((x) => isSameDay(x.timestamp, selectedDate));
   }, [logs, selectedDate]);
 
-  async function sendCommand(command) {
+  function deviceLabel(deviceId) {
+    return deviceId === "mist" ? "เครื่องพ่นหมอก" : "ปั๊มน้ำ";
+  }
+
+  async function sendCommand(command, deviceId = "pump", customDuration) {
     try {
       setBusy(true);
+      const durationValue =
+        command === "ON" ? Number(customDuration ?? duration) || undefined : undefined;
       await api.post("/device/command", {
         command,
-        duration_sec: Number(duration) || undefined,
+        device_id: deviceId,
+        duration_sec: durationValue,
       });
-      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
-      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
+      const action = command === "ON" ? "เปิด" : command === "OFF" ? "ปิด" : command;
+      toast.success(`สั่งงาน${deviceLabel(deviceId)}สำเร็จ: ${action}`);
       await loadAll();
     } catch (e) {
       toast.error(e.message || "ส่งคำสั่งไม่สำเร็จ");
@@ -154,6 +162,20 @@ export default function ControlPump() {
     }
   }
 
+  async function cancelAllCommands() {
+    try {
+      setBusy(true);
+      const res = await api.post("/device/commands/cancel-all");
+      const canceled = Number(res?.data?.canceled_pending || 0);
+      toast.success(`ยกเลิกคิว ${canceled} รายการ และสั่งหยุดปั๊ม/พ่นหมอกแล้ว`);
+      await loadAll();
+    } catch (e) {
+      toast.error(e.message || "ยกเลิกรายการไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -200,6 +222,42 @@ export default function ControlPump() {
                 </Button>
                 <Button variant="outline" onClick={resumePump} disabled={pauseBusy} className="w-full sm:w-auto">
                   {pauseBusy ? "กำลังส่ง..." : "ทำงานต่อ"}
+                </Button>
+                <Button variant="outline" onClick={cancelAllCommands} disabled={busy} className="w-full sm:w-auto">
+                  {busy ? "กำลังส่ง..." : "ยกเลิกทั้งหมด"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-4">
+              <div>
+                <div className="text-sm text-gray-600 mb-1">เวลาพ่นหมอกต่อครั้ง (วินาที)</div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={3600}
+                  value={mistDuration}
+                  onChange={(e) => setMistDuration(e.target.value)}
+                  placeholder="เช่น 10"
+                />
+                <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1-3600 วินาที</div>
+              </div>
+
+              <div className="flex gap-2 sm:justify-end sm:items-end">
+                <Button
+                  onClick={() => sendCommand("ON", "mist", mistDuration)}
+                  disabled={busy}
+                  className="w-full sm:w-auto"
+                >
+                  {busy ? "กำลังส่ง..." : "เปิดพ่นหมอก"}
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => sendCommand("OFF", "mist")}
+                  disabled={busy}
+                  className="w-full sm:w-auto"
+                >
+                  {busy ? "กำลังส่ง..." : "ปิดพ่นหมอก"}
                 </Button>
               </div>
             </div>
@@ -300,7 +358,7 @@ export default function ControlPump() {
                     <td className="py-2 pr-4 text-gray-700">
                       {l.timestamp ? new Date(l.timestamp).toLocaleString() : "-"}
                     </td>
-                    <td className="py-2 pr-4 text-gray-700">{l.device_id || "pump"}</td>
+                    <td className="py-2 pr-4 text-gray-700">{deviceLabel(l.device_id || "pump")}</td>
                     <td className="py-2 pr-4">
                       <Badge variant={l.command === "ON" ? "green" : "red"}>{l.command || "-"}</Badge>
                     </td>
