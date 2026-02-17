@@ -198,6 +198,24 @@ export default function DeviceCommandsLog() {
     }
   }
 
+  async function cancelDeviceCommands(deviceId) {
+    try {
+      setBusy(true);
+      const res = await api.post("/device/commands/cancel-device", {
+        device_id: deviceId,
+      });
+      const canceled = Number(res?.data?.canceled_pending || 0);
+      toast.success(
+        `ยกเลิกคิว${deviceLabel(deviceId)} ${canceled} รายการ และสั่งหยุดอุปกรณ์แล้ว`
+      );
+      await loadLogs();
+    } catch (e) {
+      toast.error(e.message || "ยกเลิกรายการไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -223,89 +241,125 @@ export default function DeviceCommandsLog() {
       </div>
 
       <Card className="p-5">
-        <div className="flex flex-col lg:flex-row gap-5 lg:items-end lg:justify-between">
-          <div className="flex-1">
-            <div className="text-lg font-semibold text-gray-900">สั่งปั๊มรดน้ำ</div>
-            <div className="text-sm text-gray-500 mt-1">
-              ระบบจะบันทึกคำสั่งไว้เพื่อดูย้อนหลัง
+        <div className="text-lg font-semibold text-gray-900">แผงควบคุมอุปกรณ์</div>
+        <div className="text-sm text-gray-500 mt-1">
+          แยกควบคุมปั๊มน้ำและพ่นหมอก พร้อมคำสั่งระบบในจุดเดียว
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-gray-200 p-4">
+            <div className="font-semibold text-gray-900">ปั๊มน้ำ</div>
+            <div className="text-xs text-gray-500 mt-1">กำหนดเวลาและสั่งเปิด/ปิดปั๊มน้ำ</div>
+
+            <div className="mt-3">
+              <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที)</div>
+              <Input
+                type="number"
+                min={1}
+                max={3600}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="เช่น 10"
+              />
+              <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1-3600 วินาที</div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที)</div>
-                <Input
-                  type="number"
-                  min={1}
-                  max={3600}
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="เช่น 10"
-                />
-                <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1–3600 วินาที</div>
-              </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button onClick={() => sendCommand("ON")} disabled={busy || !farmId}>
+                {busy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
+              </Button>
+              <Button variant="danger" onClick={() => sendCommand("OFF")} disabled={busy || !farmId}>
+                {busy ? "กำลังส่ง..." : "หยุดรดน้ำ"}
+              </Button>
+            </div>
+          </div>
 
-              <div className="flex gap-2 sm:justify-end sm:items-end">
-                <Button onClick={() => sendCommand("ON")} disabled={busy || !farmId} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
-                </Button>
-                <Button variant="danger" onClick={() => sendCommand("OFF")} disabled={busy || !farmId} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "หยุดรดน้ำ"}
-                </Button>
-                <Button variant="outline" onClick={pausePump} disabled={pauseBusy || !farmId} className="w-full sm:w-auto">
+          <div className="rounded-2xl border border-gray-200 p-4">
+            <div className="font-semibold text-gray-900">เครื่องพ่นหมอก</div>
+            <div className="text-xs text-gray-500 mt-1">กำหนดเวลาและสั่งเปิด/ปิดพ่นหมอก</div>
+
+            <div className="mt-3">
+              <div className="text-sm text-gray-600 mb-1">เวลาพ่นหมอกต่อครั้ง (วินาที)</div>
+              <Input
+                type="number"
+                min={1}
+                max={3600}
+                value={mistDuration}
+                onChange={(e) => setMistDuration(e.target.value)}
+                placeholder="เช่น 10"
+              />
+              <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1-3600 วินาที</div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button onClick={() => sendCommand("ON", "mist", mistDuration)} disabled={busy || !farmId}>
+                {busy ? "กำลังส่ง..." : "เปิดพ่นหมอก"}
+              </Button>
+              <Button variant="danger" onClick={() => sendCommand("OFF", "mist")} disabled={busy || !farmId}>
+                {busy ? "กำลังส่ง..." : "ปิดพ่นหมอก"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-gray-200 p-4">
+          <div className="font-semibold text-gray-900">คำสั่งระบบ</div>
+          <div className="text-xs text-gray-500 mt-1">ใช้กรณีต้องพักระบบหรือหยุดงาน โดยแยกตามอุปกรณ์</div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-gray-200 p-3">
+              <div className="text-sm font-semibold text-gray-900">ปั๊มน้ำ</div>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button variant="outline" onClick={pausePump} disabled={pauseBusy || !farmId}>
                   {pauseBusy ? "กำลังส่ง..." : "พักระบบรดน้ำ"}
                 </Button>
-                <Button variant="outline" onClick={resumePump} disabled={pauseBusy || !farmId} className="w-full sm:w-auto">
+                <Button variant="outline" onClick={resumePump} disabled={pauseBusy || !farmId}>
                   {pauseBusy ? "กำลังส่ง..." : "ทำงานต่อ"}
                 </Button>
-                <Button variant="outline" onClick={cancelAllCommands} disabled={busy || !farmId} className="w-full sm:w-auto">
-                  {busy ? "กำลังส่ง..." : "ยกเลิกทั้งหมด"}
+                <Button
+                  variant="outline"
+                  onClick={() => cancelDeviceCommands("pump")}
+                  disabled={busy || !farmId}
+                  className="sm:col-span-2"
+                >
+                  {busy ? "กำลังส่ง..." : "ยกเลิกคิวปั๊มน้ำ"}
                 </Button>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-4">
-              <div>
-                <div className="text-sm text-gray-600 mb-1">เวลาพ่นหมอกต่อครั้ง (วินาที)</div>
-                <Input
-                  type="number"
-                  min={1}
-                  max={3600}
-                  value={mistDuration}
-                  onChange={(e) => setMistDuration(e.target.value)}
-                  placeholder="เช่น 10"
-                />
-                <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1-3600 วินาที</div>
-              </div>
-
-              <div className="flex gap-2 sm:justify-end sm:items-end">
+            <div className="rounded-xl border border-gray-200 p-3">
+              <div className="text-sm font-semibold text-gray-900">เครื่องพ่นหมอก</div>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button
-                  onClick={() => sendCommand("ON", "mist", mistDuration)}
+                  variant="outline"
+                  onClick={() => sendCommand("PAUSE", "mist")}
                   disabled={busy || !farmId}
-                  className="w-full sm:w-auto"
                 >
-                  {busy ? "กำลังส่ง..." : "เปิดพ่นหมอก"}
+                  {busy ? "กำลังส่ง..." : "พักระบบพ่นหมอก"}
                 </Button>
                 <Button
-                  variant="danger"
-                  onClick={() => sendCommand("OFF", "mist")}
+                  variant="outline"
+                  onClick={() => sendCommand("RESUME", "mist")}
                   disabled={busy || !farmId}
-                  className="w-full sm:w-auto"
                 >
-                  {busy ? "กำลังส่ง..." : "ปิดพ่นหมอก"}
+                  {busy ? "กำลังส่ง..." : "ทำงานต่อ"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => cancelDeviceCommands("mist")}
+                  disabled={busy || !farmId}
+                  className="sm:col-span-2"
+                >
+                  {busy ? "กำลังส่ง..." : "ยกเลิกคิวพ่นหมอก"}
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="lg:w-[360px]">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="font-semibold text-emerald-900">คำแนะนำสำหรับผักบุ้ง</div>
-              <ul className="mt-2 text-sm text-emerald-800 list-disc pl-5 space-y-1">
-                <li>ผักบุ้งชอบดินชื้นสม่ำเสมอ แนะนำรดเป็นช่วงสั้น ๆ แต่ต่อเนื่อง</li>
-                <li>หากดินชื้นมากให้เว้นช่วงรดน้ำเพื่อกันน้ำขัง</li>
-                <li>ดูประวัติคำสั่งด้านล่างได้เลย</li>
-              </ul>
-            </div>
+          <div className="mt-3">
+            <Button variant="outline" onClick={cancelAllCommands} disabled={busy || !farmId} className="w-full sm:w-auto">
+              {busy ? "กำลังส่ง..." : "ยกเลิกทั้งหมด (ทุกอุปกรณ์)"}
+            </Button>
           </div>
         </div>
       </Card>

@@ -5,6 +5,7 @@ import Button from "../../components/ui/Button.jsx";
 import Input from "../../components/ui/Input.jsx";
 import Badge from "../../components/ui/Badge.jsx";
 import Spinner from "../../components/ui/Spinner.jsx";
+import Modal from "../../components/ui/Modal.jsx";
 import { useToast } from "../../components/ui/ToastProvider.jsx";
 
 export default function Farms() {
@@ -17,6 +18,12 @@ export default function Farms() {
   const [q, setQ] = useState("");
   const [farmName, setFarmName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editFarmId, setEditFarmId] = useState("");
+  const [editFarmName, setEditFarmName] = useState("");
+  const [editDiscord, setEditDiscord] = useState("");
+  const [editDiscordOriginal, setEditDiscordOriginal] = useState("");
 
   const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
@@ -523,14 +530,43 @@ void loop() {
   }
 
   async function rename(f) {
-    const name = window.prompt("แก้ไขชื่อฟาร์ม", f.farm_name || "");
-    if (!name || !name.trim()) return;
     try {
-      await api.put(`/farms/${f._id}`, { farm_name: name.trim() });
-      toast.success("อัปเดตชื่อฟาร์มแล้ว");
+      const farmId = String(f._id);
+      const discordRes = await api.get(`/admin/farms/${encodeURIComponent(farmId)}/discord-webhook`);
+      const currentDiscord = String(discordRes?.data?.discord_webhook_url || "");
+      setEditFarmId(farmId);
+      setEditFarmName(String(f.farm_name || ""));
+      setEditDiscord(currentDiscord);
+      setEditDiscordOriginal(currentDiscord);
+      setEditOpen(true);
+    } catch (e) {
+      toast.error(e?.message || "อัปเดตไม่สำเร็จ");
+    }
+  }
+
+  async function saveEdit() {
+    const nameTrim = String(editFarmName || "").trim();
+    const discordTrim = String(editDiscord || "").trim();
+
+    if (!nameTrim) return toast.error("กรุณากรอกชื่อฟาร์ม");
+    if (discordTrim && !discordTrim.startsWith("https://discord.com/api/webhooks/")) {
+      return toast.error("ลิงก์ Discord Webhook ไม่ถูกต้อง");
+    }
+
+    try {
+      setEditSaving(true);
+      await api.put(`/farms/${editFarmId}`, { farm_name: nameTrim });
+      await api.post(`/admin/farms/${encodeURIComponent(editFarmId)}/discord-webhook`, {
+        discord_webhook_url: discordTrim,
+        discord_enabled: Boolean(discordTrim),
+      });
+      setEditOpen(false);
+      toast.success("อัปเดตชื่อฟาร์มและลิงก์ Discord แล้ว");
       await load();
     } catch (e) {
       toast.error(e?.message || "อัปเดตไม่สำเร็จ");
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -637,6 +673,44 @@ void loop() {
           </div>
         )}
       </Card>
+
+      <Modal open={editOpen} title="แก้ไขฟาร์ม" onClose={() => !editSaving && setEditOpen(false)}>
+        <div className="space-y-3">
+          <div>
+            <div className="text-sm mb-1">ชื่อฟาร์ม</div>
+            <Input
+              value={editFarmName}
+              onChange={(e) => setEditFarmName(e.target.value)}
+              placeholder="ชื่อฟาร์ม"
+            />
+          </div>
+
+          <div>
+            <div className="text-sm mb-1">ลิงก์ Discord เดิม</div>
+            <div className="text-xs rounded-md border bg-gray-50 px-3 py-2 break-all">
+              {editDiscordOriginal || "-"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm mb-1">Discord Webhook (เว้นว่างได้)</div>
+            <Input
+              value={editDiscord}
+              onChange={(e) => setEditDiscord(e.target.value)}
+              placeholder="https://discord.com/api/webhooks/..."
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              ยกเลิก
+            </Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving ? "กำลังบันทึก..." : "บันทึก"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

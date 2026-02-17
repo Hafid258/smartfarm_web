@@ -1123,7 +1123,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* ✅ Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-8">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <SummaryCard
               title={
                 <>

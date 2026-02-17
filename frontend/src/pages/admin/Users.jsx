@@ -30,6 +30,7 @@ export default function Users() {
   const [mode, setMode] = useState("create"); // create | edit
   const [editingId, setEditingId] = useState("");
   const [form, setForm] = useState(emptyForm);
+  const [tempPassword, setTempPassword] = useState("");
 
   function pickError(e, fallback) {
     return e?.response?.data?.error || e?.message || fallback;
@@ -82,12 +83,14 @@ export default function Users() {
   function startCreate() {
     setMode("create");
     setEditingId("");
+    setTempPassword("");
     setForm((p) => ({ ...emptyForm, farm_id: p.farm_id || farms?.[0]?._id || "" }));
   }
 
   function startEdit(u) {
     setMode("edit");
     setEditingId(u._id);
+    setTempPassword("");
     setForm({
       username: u.username || "",
       email: u.email || "",
@@ -137,6 +140,32 @@ export default function Users() {
       startCreate();
     } catch (e) {
       const m = pickError(e, "บันทึกไม่สำเร็จ");
+      setErr(m);
+      toast.error(m);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function makeTempPassword() {
+    const rand = Math.random().toString(36).slice(-6);
+    return `Tmp@${rand}`;
+  }
+
+  async function resetTempPassword() {
+    if (!editingId) return;
+    const ok = window.confirm("ยืนยันรีเซ็ตรหัสผ่านผู้ใช้นี้เป็นรหัสชั่วคราว?");
+    if (!ok) return;
+
+    const nextPassword = makeTempPassword();
+
+    try {
+      setSaving(true);
+      await api.put(`/admin/users/${editingId}`, { password: nextPassword });
+      setTempPassword(nextPassword);
+      toast.success("รีเซ็ตรหัสผ่านชั่วคราวสำเร็จ");
+    } catch (e) {
+      const m = pickError(e, "รีเซ็ตรหัสผ่านไม่สำเร็จ");
       setErr(m);
       toast.error(m);
     } finally {
@@ -318,12 +347,30 @@ export default function Users() {
               <div className="text-sm text-gray-600 mb-1">
                 รหัสผ่าน {mode === "edit" ? "(ใส่เพื่อรีเซ็ต)" : "(ถ้าไม่ใส่ ระบบจะตั้งค่าเริ่มต้น 123456)"}
               </div>
+              {mode === "edit" ? (
+                <div className="mb-2">
+                  <div className="text-xs text-gray-500 mb-1">รหัสเดิม (เข้ารหัสไว้ ไม่สามารถดูค่าจริง)</div>
+                  <Input type="password" value="********" readOnly />
+                </div>
+              ) : null}
               <Input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                placeholder="อย่างน้อย 6 ตัวอักษร"
+                placeholder={mode === "edit" ? "ใส่รหัสใหม่อย่างน้อย 6 ตัวอักษร" : "อย่างน้อย 6 ตัวอักษร"}
               />
+              {mode === "edit" ? (
+                <div className="mt-2 space-y-2">
+                  <Button variant="outline" onClick={resetTempPassword} disabled={saving}>
+                    รีเซ็ตรหัสผ่านชั่วคราว
+                  </Button>
+                  {tempPassword ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                      รหัสชั่วคราวใหม่: <span className="font-mono font-semibold">{tempPassword}</span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="pt-2 flex gap-2">

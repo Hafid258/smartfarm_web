@@ -4,7 +4,6 @@ import Card from "../../components/ui/Card.jsx";
 import Button from "../../components/ui/Button.jsx";
 import Badge from "../../components/ui/Badge.jsx";
 import Spinner from "../../components/ui/Spinner.jsx";
-import { useToast } from "../../components/ui/ToastProvider.jsx";
 
 function fmtTime(t) {
   if (!t) return "-";
@@ -104,11 +103,9 @@ function lightText(percent, raw) {
 }
 
 export default function DeviceStatus() {
-  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [devices, setDevices] = useState([]);
   const [err, setErr] = useState("");
-  const [pumpBusy, setPumpBusy] = useState({});
 
   const loadDevices = useCallback(async () => {
     try {
@@ -140,25 +137,16 @@ export default function DeviceStatus() {
     return { onlineCount, offlineCount };
   }, [cards]);
 
-  const setBusy = (id, v) => {
-    setPumpBusy((prev) => ({ ...prev, [id]: v }));
-  };
-
-  const sendPump = async (command, deviceId) => {
+  const farmDisplayName = useMemo(() => {
     try {
-      setBusy(deviceId, true);
-      await api.post("/device/command", {
-        command,
-        device_id: deviceId,
-      });
-      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
-      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
-    } catch (e) {
-      toast.error(e?.response?.data?.error || e.message || "ส่งคำสั่งไม่สำเร็จ");
-    } finally {
-      setBusy(deviceId, false);
+      const raw = localStorage.getItem("user");
+      if (!raw) return "ฟาร์มของฉัน";
+      const parsed = JSON.parse(raw);
+      return parsed?.farm_name || parsed?.farm_id?.farm_name || "ฟาร์มของฉัน";
+    } catch {
+      return "ฟาร์มของฉัน";
     }
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -200,7 +188,7 @@ export default function DeviceStatus() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-lg font-bold text-gray-900">
-                    {d.device_key}
+                    {farmDisplayName}
                   </div>
                   <div className="text-sm text-gray-700 mt-1">
                     สถานะ:{" "}
@@ -280,22 +268,6 @@ export default function DeviceStatus() {
                   <span className="text-gray-600">เฟิร์มแวร์</span>
                   <span className="font-semibold">{d.fw_version || "-"}</span>
                 </div>
-              </div>
-
-              <div className="mt-4 flex gap-2">
-                <Button
-                  onClick={() => sendPump("ON", d.device_key)}
-                  disabled={pumpBusy[d.device_key] || !d.online}
-                >
-                  {pumpBusy[d.device_key] ? "กำลังส่ง..." : "รดน้ำ"}
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => sendPump("OFF", d.device_key)}
-                  disabled={pumpBusy[d.device_key] || !d.online}
-                >
-                  หยุด
-                </Button>
               </div>
 
               <div className="mt-4">
