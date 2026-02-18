@@ -537,6 +537,51 @@ secured.post("/commands/cancel-all", async (req, res) => {
   }
 });
 
+// POST /api/device/commands/cancel-device
+secured.post("/commands/cancel-device", async (req, res) => {
+  try {
+    const farm_id = req.farmId;
+    if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
+
+    const device_id = String(req.body?.device_id || "").trim().toLowerCase();
+    if (!["pump", "mist"].includes(device_id)) {
+      return res.status(400).json({ error: "device_id must be pump or mist" });
+    }
+
+    const storeFarmId = farmIdForStore(farm_id);
+    const now = new Date();
+    const source = req.user?.role || "user";
+
+    const pendingFilter = { ...farmQueryAnyType(farm_id), status: "pending", device_id };
+    const pendingCount = await DeviceCommand.countDocuments(pendingFilter);
+
+    await DeviceCommand.updateMany(
+      pendingFilter,
+      { $set: { status: "failed", completed_at: now } }
+    );
+
+    await DeviceCommand.create({
+      farm_id: storeFarmId,
+      device_id,
+      command: "OFF",
+      duration_sec: 0,
+      status: "pending",
+      source,
+      timestamp: now,
+    });
+
+    res.json({
+      ok: true,
+      device_id,
+      canceled_pending: pendingCount,
+      queued_stop: true,
+    });
+  } catch (err) {
+    console.error("DEVICE CANCEL BY DEVICE ERROR:", err);
+    res.status(500).json({ error: err?.message || "Failed to cancel commands by device" });
+  }
+});
+
 router.use("/", secured);
 
 export default router;

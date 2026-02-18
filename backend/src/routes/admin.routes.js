@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import User from "../models/User.js";
 import Farm from "../models/Farm.js";
+import NotificationSetting from "../models/NotificationSetting.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -25,6 +26,8 @@ const pickFarmIdOrNull = (farm_id) => {
 };
 
 const sanitizeString = (s) => (typeof s === "string" ? s.trim() : "");
+const isValidDiscordWebhook = (url) =>
+  !url || String(url).startsWith("https://discord.com/api/webhooks/");
 
 // -------------------------
 // ✅ GET /api/admin/farms
@@ -41,6 +44,108 @@ router.get("/farms", async (_req, res) => {
   } catch (e) {
     console.error("ADMIN GET FARMS ERROR:", e);
     res.status(500).json({ error: "Failed to load farms" });
+  }
+});
+
+// -------------------------
+// ✅ GET /api/admin/farms/:id/discord-webhook
+// read discord webhook from notification_settings by farm users
+// -------------------------
+router.get("/farms/:id/discord-webhook", async (req, res) => {
+  try {
+    const farmId = req.params.id;
+    if (!isValidObjectId(farmId)) return res.status(400).json({ error: "invalid farm id" });
+
+    const users = await User.find({ farm_id: new mongoose.Types.ObjectId(farmId) })
+      .select("_id username")
+      .lean();
+
+    if (!users.length) {
+      return res.json({
+        discord_webhook_url: "",
+        discord_enabled: false,
+        user_count: 0,
+        configured_users: 0,
+      });
+    }
+
+    const userIds = users.map((u) => u._id);
+    const settings = await NotificationSetting.find({ user_id: { $in: userIds } })
+      .select("user_id discord_webhook_url discord_enabled")
+      .lean();
+
+    const preferred =
+      settings.find((s) => sanitizeString(s.discord_webhook_url)) ||
+      settings[0] ||
+      null;
+
+    const configuredUsers = settings.filter((s) => sanitizeString(s.discord_webhook_url)).length;
+
+    return res.json({
+      discord_webhook_url: sanitizeString(preferred?.discord_webhook_url),
+      discord_enabled: Boolean(preferred?.discord_enabled),
+      user_count: users.length,
+      configured_users: configuredUsers,
+    });
+  } catch (e) {
+    console.error("ADMIN GET FARM DISCORD WEBHOOK ERROR:", e);
+    return res.status(500).json({ error: "Failed to load discord webhook" });
+  }
+});
+
+// -------------------------
+// ✅ POST /api/admin/farms/:id/discord-webhook
+// update discord webhook into notification_settings for all users in farm
+// -------------------------
+router.post("/farms/:id/discord-webhook", async (req, res) => {
+  try {
+    const farmId = req.params.id;
+    if (!isValidObjectId(farmId)) return res.status(400).json({ error: "invalid farm id" });
+
+    const discord_webhook_url = sanitizeString(req.body.discord_webhook_url || "");
+    if (!isValidDiscordWebhook(discord_webhook_url)) {
+      return res.status(400).json({ error: "Discord Webhook URL ไม่ถูกต้อง" });
+    }
+
+    const users = await User.find({ farm_id: new mongoose.Types.ObjectId(farmId) })
+      .select("_id")
+      .lean();
+    if (!users.length) {
+      return res.status(400).json({ error: "ไม่พบผู้ใช้ในฟาร์มนี้" });
+    }
+
+    const discord_enabled =
+      req.body.discord_enabled !== undefined
+        ? Boolean(req.body.discord_enabled)
+        : Boolean(discord_webhook_url);
+
+    const now = new Date();
+    const ops = users.map((u) => ({
+      updateOne: {
+        filter: { user_id: u._id },
+        update: {
+          $set: {
+            notify_channel: "discord",
+            discord_webhook_url,
+            discord_enabled,
+            updated_at: now,
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    await NotificationSetting.bulkWrite(ops);
+
+    return res.json({
+      ok: true,
+      updated_users: users.length,
+      discord_webhook_url,
+      discord_enabled,
+    });
+  } catch (e) {
+    console.error("ADMIN SET FARM DISCORD WEBHOOK ERROR:", e);
+    return res.status(500).json({ error: "Failed to save discord webhook" });
   }
 });
 

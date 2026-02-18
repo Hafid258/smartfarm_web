@@ -243,6 +243,7 @@ export default function Dashboard() {
   const [openChartPicker, setOpenChartPicker] = useState(false);
   const [openExportMenu, setOpenExportMenu] = useState(false);
   const [openExportModal, setOpenExportModal] = useState(false);
+  const [openNotifModal, setOpenNotifModal] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMonth, setExportMonth] = useState("");
   const [exportOptions, setExportOptions] = useState({
@@ -657,6 +658,31 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      <Modal
+        open={openNotifModal}
+        title={`แจ้งเตือนล่าสุด (${notifs.length})`}
+        onClose={() => setOpenNotifModal(false)}
+      >
+        {notifs.length === 0 ? (
+          <div className="text-sm text-gray-500">ยังไม่มีการแจ้งเตือน</div>
+        ) : (
+          <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
+            {notifs.map((n) => (
+              <div key={n._id} className="rounded-2xl border p-4 flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold text-gray-900">{n.alert_type || "แจ้งเตือน"}</div>
+                  <Badge>{n.severity || "info"}</Badge>
+                </div>
+                <div className="text-sm text-gray-700">{n.details || "-"}</div>
+                <div className="text-xs text-gray-500">
+                  {n.timestamp ? new Date(n.timestamp).toLocaleString() : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+
       <Modal open={openExportModal} title="เลือกข้อมูลที่จะส่งออก" onClose={() => setOpenExportModal(false)}>
         <div className="space-y-4">
           <div>
@@ -746,6 +772,33 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2 justify-end">
           <Button variant="outline" onClick={() => setOpenChartPicker((v) => !v)}>
             {openChartPicker ? "ปิดรายการกราฟ" : "เลือกกราฟที่อยากดู"}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => setOpenNotifModal(true)}
+            className="relative"
+            title="แจ้งเตือนล่าสุด"
+          >
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+              <path d="M9 17a3 3 0 0 0 6 0" />
+            </svg>
+            <span className="ml-2">แจ้งเตือน</span>
+            {notifs.length > 0 ? (
+              <span className="ml-2 min-w-6 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
+                {notifs.length}
+              </span>
+            ) : null}
           </Button>
 
           <div className="relative" ref={exportMenuRef}>
@@ -980,7 +1033,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <Card className="p-5">
               <div className="flex items-center justify-between">
                 <div className="text-lg font-semibold text-gray-900">ค่าตั้งระบบรดน้ำ</div>
@@ -1008,31 +1061,6 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">การแจ้งเตือนล่าสุด</div>
-                <Badge variant="blue">แจ้งเตือน</Badge>
-              </div>
-
-              {notifs.length === 0 ? (
-                <div className="mt-3 text-sm text-gray-500">ยังไม่มีการแจ้งเตือน</div>
-              ) : (
-                <div className="mt-4 space-y-2">
-                  {notifs.map((n) => (
-                    <div key={n._id} className="rounded-2xl border p-4 flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="font-semibold text-gray-900">{n.alert_type || "แจ้งเตือน"}</div>
-                        <Badge>{n.severity || "info"}</Badge>
-                      </div>
-                      <div className="text-sm text-gray-700">{n.details || "-"}</div>
-                      <div className="text-xs text-gray-500">
-                        {n.timestamp ? new Date(n.timestamp).toLocaleString() : ""}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
           </div>
 
           {!latestShow && filteredSensorHistory.length === 0 && (

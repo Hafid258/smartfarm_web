@@ -18,8 +18,8 @@
 #include <BH1750.h>
 
 // ------------------ WiFi ------------------
-const char* WIFI_SSID = "Gggg";
-const char* WIFI_PASS = "12345678";
+const char* WIFI_SSID = "ASUS_5G";
+const char* WIFI_PASS = "1234567890";
 
 // ------------------ API (fixed) ------------------
 // NOTE: CONFIG_URL is unused unless you return JSON with { api_base: "..." }
@@ -110,6 +110,8 @@ bool mistRunning = false;
 unsigned long mistStopAtMs = 0;
 unsigned long mistStartedAtMs = 0;
 String pendingMistOnCommandId = "";
+bool mistPaused = false;
+unsigned long pausedMistRemainingSec = 0;
 
 // MANUAL tracking
 bool manualActive = false;          // true เมื่อมีคำสั่งจากเว็บ / กำลังรันตามคำสั่ง
@@ -314,6 +316,8 @@ void ensureWiFi() {
     mistRunning = false;
     mistStopAtMs = 0;
   }
+  mistPaused = false;
+  pausedMistRemainingSec = 0;
 
   Serial.printf("Connecting WiFi: %s\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
@@ -560,6 +564,8 @@ void pollCommands() {
 
   if (deviceId == "mist") {
     if (cmdStr == "ON") {
+      mistPaused = false;
+      pausedMistRemainingSec = 0;
       if (!mistRunning) {
         pendingMistOnCommandId = id;
         startMistForSeconds(duration > 0 ? duration : 30);
@@ -572,6 +578,23 @@ void pollCommands() {
         sendAck(pendingMistOnCommandId.c_str(), "failed", 0);
         pendingMistOnCommandId = "";
         mistStartedAtMs = 0;
+      }
+      mistPaused = false;
+      pausedMistRemainingSec = 0;
+      sendAck(id, "done", 0);
+    } else if (cmdStr == "PAUSE") {
+      if (mistRunning) {
+        unsigned long remainMs = mistStopAtMs > millis() ? (mistStopAtMs - millis()) : 0;
+        pausedMistRemainingSec = (remainMs + 999) / 1000UL;
+        stopMist();
+        mistPaused = true;
+      }
+      sendAck(id, "done", 0);
+    } else if (cmdStr == "RESUME") {
+      if (mistPaused && pausedMistRemainingSec > 0) {
+        startMistForSeconds((int)pausedMistRemainingSec);
+        mistPaused = false;
+        pausedMistRemainingSec = 0;
       }
       sendAck(id, "done", 0);
     } else {
