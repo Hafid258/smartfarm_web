@@ -1,7 +1,10 @@
+import { createPortal } from "react-dom";
+
 export default function Modal({ open, title, children, onClose }) {
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  const content = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       onClick={onClose}
@@ -29,4 +32,6 @@ export default function Modal({ open, title, children, onClose }) {
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
