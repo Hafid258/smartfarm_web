@@ -16,9 +16,10 @@
 #include "DHT.h"
 #include <Wire.h>
 #include <BH1750.h>
+#include <esp_system.h>
 
 // ------------------ WiFi ------------------
-const char* WIFI_SSID = "ASUS_5G";
+const char* WIFI_SSID = "SUDOFARM4G";
 const char* WIFI_PASS = "1234567890";
 
 // ------------------ API (fixed) ------------------
@@ -69,8 +70,8 @@ unsigned long lastPollMs   = 0;
 unsigned long lastHealthMs = 0;
 
 const unsigned long SENSOR_INTERVAL_MS = 60UL * 1000UL;
-const unsigned long STATUS_INTERVAL_MS = 30UL * 1000UL;
-const unsigned long POLL_INTERVAL_MS   = 12UL * 1000UL;
+const unsigned long STATUS_INTERVAL_MS = 60UL * 1000UL;
+const unsigned long POLL_INTERVAL_MS   = 20UL * 1000UL;
 // ปิดการเรียก /health เพื่อลดโอกาส connection refused จาก ngrok
 const unsigned long HEALTH_INTERVAL_MS = 24UL * 60UL * 60UL * 1000UL; // 24 ชั่วโมง
 
@@ -79,6 +80,13 @@ unsigned long nextNetAllowedMs = 0;
 unsigned long netBackoffMs = 0;
 const unsigned long NET_BACKOFF_BASE_MS = 3000UL;
 const unsigned long NET_BACKOFF_MAX_MS  = 30000UL;
+unsigned int netFailStreak = 0;
+unsigned long lastNetFailMs = 0;
+unsigned long lastRecoverAttemptMs = 0;
+const unsigned int NET_FAIL_RECONNECT_THRESHOLD = 3;
+const unsigned int NET_FAIL_RESTART_THRESHOLD = 10;
+const unsigned long NET_RECOVER_COOLDOWN_MS = 15000UL;
+const unsigned long NET_FAIL_WINDOW_MS = 120000UL;
 
 bool netAllowed() {
   return millis() >= nextNetAllowedMs;
@@ -87,14 +95,44 @@ bool netAllowed() {
 void noteNetSuccess() {
   netBackoffMs = 0;
   nextNetAllowedMs = 0;
+  netFailStreak = 0;
+  lastNetFailMs = 0;
 }
 
 void noteNetFailure() {
+  netFailStreak++;
+  lastNetFailMs = millis();
+
   if (netBackoffMs == 0) netBackoffMs = NET_BACKOFF_BASE_MS;
   else netBackoffMs = (unsigned long)min((uint32_t)NET_BACKOFF_MAX_MS, (uint32_t)(netBackoffMs * 2UL));
 
   nextNetAllowedMs = millis() + netBackoffMs;
-  Serial.printf("[NET] backoff %lu ms\n", netBackoffMs);
+  Serial.printf("[NET] backoff %lu ms (fail streak=%u)\n", netBackoffMs, netFailStreak);
+}
+
+void handleNetworkAutoRecover() {
+  if (netFailStreak == 0) return;
+  if (millis() - lastRecoverAttemptMs < NET_RECOVER_COOLDOWN_MS) return;
+
+  // ถ้าหลุดถี่มากในช่วงสั้น ๆ ให้รีบูตทั้งบอร์ด
+  if (netFailStreak >= NET_FAIL_RESTART_THRESHOLD &&
+      lastNetFailMs > 0 &&
+      (millis() - lastNetFailMs) <= NET_FAIL_WINDOW_MS) {
+    Serial.printf("[NET] fail streak=%u within %lu ms -> ESP restart\n", netFailStreak, NET_FAIL_WINDOW_MS);
+    delay(200);
+    ESP.restart();
+    return;
+  }
+
+  // ระดับแรก: ตัด-ต่อ WiFi ใหม่
+  if (netFailStreak >= NET_FAIL_RECONNECT_THRESHOLD) {
+    lastRecoverAttemptMs = millis();
+    Serial.printf("[NET] fail streak=%u -> force WiFi reconnect\n", netFailStreak);
+    WiFi.disconnect(true, true);
+    delay(200);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  }
 }
 
 // Pump runtime
@@ -122,6 +160,18 @@ const unsigned long ACK_RETRY_MS = 5000UL;
 
 // DHT
 DHT dht(DHTPIN, DHTTYPE);
+bool hasLastDht = false;
+float lastGoodTemp = 30.0f;
+float lastGoodHum = 60.0f;
+unsigned long lastRelaySwitchMs = 0;
+const unsigned long DHT_GUARD_AFTER_RELAY_MS = 5000UL;
+unsigned long lastDhtAttemptMs = 0;
+const unsigned long DHT_RETRY_NO_CACHE_MS = 10000UL;     // ยังไม่มี cache: ลองทุก 10 วินาที
+const unsigned long DHT_RETRY_WITH_CACHE_MS = 180000UL;  // มี cache แล้ว: อ่านจริงทุก 3 นาที
+unsigned int dhtFailStreak = 0;
+unsigned long lastDhtReinitMs = 0;
+const unsigned int DHT_REINIT_THRESHOLD = 3;
+const unsigned long DHT_REINIT_COOLDOWN_MS = 15000UL;
 
 // ------------------ Utils ------------------
 // ???? api_base ??? Cloudflare Worker
@@ -143,10 +193,10 @@ String fetchApiBase() {
 }
 
 void buildEndpoints() {
-  EP_SENSOR = apiBase + "/device/sensor";
-  EP_STATUS = apiBase + "/device-status/status?farm_id=" + String(FARM_ID);
+  EP_SENSOR = apiBase + "/device/sensor?farm_id=" + String(FARM_ID) + "&device_key=" + String(DEVICE_KEY);
+  EP_STATUS = apiBase + "/device-status/status?farm_id=" + String(FARM_ID) + "&device_key=" + String(DEVICE_KEY);
   EP_POLL   = apiBase + "/device/commands/poll?farm_id=" + String(FARM_ID) + "&device_key=" + String(DEVICE_KEY);
-  EP_ACK    = apiBase + "/device/commands/ack";
+  EP_ACK    = apiBase + "/device/commands/ack?farm_id=" + String(FARM_ID) + "&device_key=" + String(DEVICE_KEY);
   EP_HEALTH = apiBase + "/health";
 }
 
@@ -162,6 +212,7 @@ static inline int clampInt(int v, int lo, int hi) {
 }
 
 static inline float clampFloat(float v, float lo, float hi) {
+  if (!isfinite(v)) return lo;
   if (v < lo) return lo;
   if (v > hi) return hi;
   return v;
@@ -243,16 +294,17 @@ int httpPostJson(const String& url, const String& json) {
   // ✅ NEW: ngrok skip warning (ช่วยให้ไม่โดนหน้า HTML)
   http.addHeader("ngrok-skip-browser-warning", "1");
 
-  int code = http.POST((uint8_t*)json.c_str(), json.length());
+  int code = http.POST(json);
   String body = http.getString();
 
-  Serial.printf("[POST] %s -> %d\n", url.c_str(), code);
+  Serial.printf("[POST] %s -> %d (len=%u)\n", url.c_str(), code, (unsigned)json.length());
   if (code < 0) {
     Serial.printf("HTTPClient error: %s\n", http.errorToString(code).c_str());
     noteNetFailure();
   } else if (code < 200 || code >= 300) {
     Serial.printf("Body: %s\n", body.c_str());
-    noteNetSuccess();
+    if (code >= 500) noteNetFailure();
+    else noteNetSuccess();
   } else {
     noteNetSuccess();
   }
@@ -288,7 +340,8 @@ int httpGet(const String& url, String& outBody) {
     noteNetFailure();
   } else if (code < 200 || code >= 300) {
     Serial.printf("Body: %s\n", outBody.c_str());
-    noteNetSuccess();
+    if (code >= 500) noteNetFailure();
+    else noteNetSuccess();
   } else {
     noteNetSuccess();
   }
@@ -342,6 +395,7 @@ void ensureWiFi() {
 void startPumpForSeconds(int sec) {
   sec = clampInt(sec, 1, 3600);
   relayWrite(RELAY1_PIN, true);
+  lastRelaySwitchMs = millis();
   pumpRunning = true;
   pumpStartedAtMs = millis();
   pumpStopAtMs = millis() + (unsigned long)sec * 1000UL;
@@ -350,6 +404,7 @@ void startPumpForSeconds(int sec) {
 
 void stopPump() {
   relayWrite(RELAY1_PIN, false);
+  lastRelaySwitchMs = millis();
   pumpRunning = false;
   pumpStopAtMs = 0;
   Serial.println("Pump OFF");
@@ -362,6 +417,7 @@ void handlePumpAutoStop() {
 void startMistForSeconds(int sec) {
   sec = clampInt(sec, 1, 3600);
   relayWrite(RELAY2_PIN, true);
+  lastRelaySwitchMs = millis();
   mistRunning = true;
   mistStartedAtMs = millis();
   mistStopAtMs = millis() + (unsigned long)sec * 1000UL;
@@ -370,6 +426,7 @@ void startMistForSeconds(int sec) {
 
 void stopMist() {
   relayWrite(RELAY2_PIN, false);
+  lastRelaySwitchMs = millis();
   mistRunning = false;
   mistStopAtMs = 0;
   Serial.println("Mist OFF");
@@ -390,8 +447,8 @@ void sendStatus() {
   if (WiFi.status() != WL_CONNECTED) return;
   if (!netAllowed()) return;
 
-  DynamicJsonDocument doc(512);
-  doc["device_key"] = DEVICE_KEY;
+  DynamicJsonDocument doc(1024);
+  doc["device_key"] = String(DEVICE_KEY);
   doc["ip"] = WiFi.localIP().toString();
   doc["wifi_rssi"] = WiFi.RSSI();
   doc["pump_state"] = pumpRunning ? "ON" : "OFF";
@@ -404,18 +461,81 @@ void sendStatus() {
 
   String payload;
   serializeJson(doc, payload);
+  if (doc.overflowed() || payload.indexOf("\"device_key\"") < 0) {
+    Serial.println("[STATUS] invalid JSON payload (missing device_key/overflow), skip send");
+    Serial.println(payload);
+    return;
+  }
 
   httpPostJson(EP_STATUS, payload);
 }
 
-void sendSensor() {
-  if (WiFi.status() != WL_CONNECTED) return;
-  if (!netAllowed()) return;
+bool sendSensor() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+  if (!netAllowed()) return false;
+  if (pumpRunning) {
+    Serial.println("[SENSOR] pump running -> pause all sensor reads");
+    return false;
+  }
 
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-  bool dhtOk = !(isnan(t) || isnan(h));
-  if (!dhtOk) Serial.println("DHT read failed");
+  float t = NAN;
+  float h = NAN;
+  bool dhtOk = false;
+  bool inRelayGuard = (millis() - lastRelaySwitchMs) < DHT_GUARD_AFTER_RELAY_MS;
+  bool shouldTryDhtNow = false;
+  unsigned long retryWindow = hasLastDht ? DHT_RETRY_WITH_CACHE_MS : DHT_RETRY_NO_CACHE_MS;
+  if (!pumpRunning && !mistRunning && !inRelayGuard && (millis() - lastDhtAttemptMs >= retryWindow)) {
+    shouldTryDhtNow = true;
+  }
+
+  if (shouldTryDhtNow) {
+    lastDhtAttemptMs = millis();
+    for (int i = 0; i < 2; i++) {
+      t = dht.readTemperature();
+      h = dht.readHumidity();
+      if (!isnan(t) && !isnan(h)) {
+        dhtOk = true;
+        break;
+      }
+      delay(20);
+      yield();
+    }
+  } else if (hasLastDht) {
+    t = lastGoodTemp;
+    h = lastGoodHum;
+    dhtOk = true;
+  }
+
+  if (dhtOk) {
+    // cache latest valid DHT value for transient read failures
+    lastGoodTemp = clampFloat(t, -20, 80);
+    lastGoodHum = clampFloat(h, 1, 100);
+    hasLastDht = true;
+    dhtFailStreak = 0;
+  } else {
+    dhtFailStreak++;
+
+    if (dhtFailStreak >= DHT_REINIT_THRESHOLD &&
+        (millis() - lastDhtReinitMs) >= DHT_REINIT_COOLDOWN_MS) {
+      lastDhtReinitMs = millis();
+      Serial.printf("[DHT] fail streak=%u -> reinit DHT\n", dhtFailStreak);
+      dht.begin();
+      delay(20);
+      yield();
+    }
+
+    if (!hasLastDht) {
+      // ไม่ให้ติดลูป skip ตอนบูต: ใช้ fallback ชั่วคราวเพื่อให้ระบบส่งข้อมูลต่อได้
+      t = clampFloat(lastGoodTemp, -20, 80);
+      h = clampFloat(lastGoodHum, 1, 100);
+      Serial.println("DHT not ready and no cached value -> use bootstrap fallback");
+      hasLastDht = true;
+    } else {
+      t = lastGoodTemp;
+      h = lastGoodHum;
+      Serial.println("DHT read failed -> use cached DHT values");
+    }
+  }
 
   int soilADC  = analogRead(PIN_SOIL_ADC);
   int soilPct  = soilPercentFromADC(soilADC);
@@ -427,15 +547,10 @@ void sendSensor() {
 
   DynamicJsonDocument doc(1024);
   doc["farm_id"] = FARM_ID;
-  doc["device_key"] = DEVICE_KEY;
+  doc["device_key"] = String(DEVICE_KEY);
 
-  if (dhtOk) {
-    doc["temperature"]  = (double)clampFloat(t, -20, 80);
-    doc["humidity_air"] = (double)clampFloat(h, 0, 100);
-  } else {
-    doc["temperature"]  = 0;
-    doc["humidity_air"] = 0;
-  }
+  doc["temperature"]  = (double)clampFloat(t, -20, 80);
+  doc["humidity_air"] = (double)clampFloat(h, 1, 100);
 
   doc["soil_raw_adc"]  = soilADC;
   doc["soil_moisture"] = soilPct;
@@ -455,18 +570,53 @@ void sendSensor() {
   doc["mode"] = manualActive ? "MANUAL" : "AUTO";
 
   String payload;
+  payload.reserve(640);
   serializeJson(doc, payload);
+  if (doc.overflowed() || payload.indexOf("\"device_key\"") < 0) {
+    Serial.println("[SENSOR] invalid JSON payload (missing device_key/overflow), skip send");
+    Serial.println(payload);
+    return false;
+  }
+  if (payload.indexOf("\"soil_moisture\"") < 0 || payload.indexOf("\"soil_raw_adc\"") < 0) {
+    Serial.println("[SENSOR] payload missing soil keys -> skip send");
+    Serial.println(payload);
+    return false;
+  }
+  // ตรวจซ้ำว่า JSON parse ได้จริงและมี key ที่ต้องมี
+  StaticJsonDocument<1024> checkDoc;
+  DeserializationError chkErr = deserializeJson(checkDoc, payload);
+  if (chkErr) {
+    Serial.printf("[SENSOR] payload JSON parse fail before send: %s\n", chkErr.c_str());
+    Serial.println(payload);
+    return false;
+  }
+  if (!checkDoc.containsKey("soil_moisture") || !checkDoc.containsKey("soil_raw_adc")) {
+    Serial.println("[SENSOR] payload JSON has no soil keys after parse -> skip send");
+    Serial.println(payload);
+    return false;
+  }
 
-  httpPostJson(EP_SENSOR, payload);
+  int sensorCode = httpPostJson(EP_SENSOR, payload);
+  if (sensorCode < 200 || sensorCode >= 300) {
+    Serial.println("[SENSOR] POST failed, payload sent was:");
+    Serial.println(payload);
+  }
 
-  Serial.printf("SOIL=%d%% adc=%d | LUX=%s | MODE=%s | PUMP=%s | MIST=%s | BH=%s\n",
+  char luxBuf[16];
+  if (luxOk) snprintf(luxBuf, sizeof(luxBuf), "%.0f", lux);
+  else snprintf(luxBuf, sizeof(luxBuf), "N/A");
+
+  Serial.printf("TEMP=%.1f RH=%.1f | SOIL=%d%% adc=%d | LUX=%s | MODE=%s | PUMP=%s | MIST=%s | BH=%s\n",
+    clampFloat(t, -20, 80), clampFloat(h, 1, 100),
     soilPct, soilADC,
-    luxOk ? String(lux, 0).c_str() : "N/A",
+    luxBuf,
     manualActive ? "MANUAL" : "AUTO",
     pumpRunning ? "ON" : "OFF",
     mistRunning ? "ON" : "OFF",
     bhOk ? "OK" : "FAIL"
   );
+
+  return true;
 }
 
 bool sendAck(const char* commandId, const char* status, int actualDurationSec) {
@@ -475,13 +625,18 @@ bool sendAck(const char* commandId, const char* status, int actualDurationSec) {
 
   DynamicJsonDocument ack(256);
   ack["farm_id"] = FARM_ID;
-  ack["device_key"] = DEVICE_KEY;
+  ack["device_key"] = String(DEVICE_KEY);
   ack["command_id"] = commandId;
   ack["status"] = status; // "done" | "failed"
   ack["actual_duration_sec"] = actualDurationSec;
 
   String payload;
   serializeJson(ack, payload);
+  if (ack.overflowed() || payload.indexOf("\"device_key\"") < 0) {
+    Serial.println("[ACK] invalid JSON payload (missing device_key/overflow), skip send");
+    Serial.println(payload);
+    return false;
+  }
   int code = httpPostJson(EP_ACK, payload);
   return code >= 200 && code < 300;
 }
@@ -669,9 +824,29 @@ void autoWateringStep() {
   }
 }
 
+const char* resetReasonToText(esp_reset_reason_t reason) {
+  switch (reason) {
+    case ESP_RST_POWERON: return "POWERON";
+    case ESP_RST_EXT: return "EXTERNAL_PIN";
+    case ESP_RST_SW: return "SOFTWARE";
+    case ESP_RST_PANIC: return "PANIC_EXCEPTION";
+    case ESP_RST_INT_WDT: return "INT_WDT";
+    case ESP_RST_TASK_WDT: return "TASK_WDT";
+    case ESP_RST_WDT: return "OTHER_WDT";
+    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+    case ESP_RST_BROWNOUT: return "BROWNOUT";
+    case ESP_RST_SDIO: return "SDIO";
+    default: return "UNKNOWN";
+  }
+}
+
 // ------------------ Setup/Loop ------------------
 void setup() {
   Serial.begin(115200);
+  delay(200);
+
+  esp_reset_reason_t rr = esp_reset_reason();
+  Serial.printf("[BOOT] reset reason: %d (%s)\n", (int)rr, resetReasonToText(rr));
 
   pinMode(RELAY1_PIN, OUTPUT);
   pinMode(RELAY2_PIN, OUTPUT);
@@ -699,11 +874,16 @@ void setup() {
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
   delay(500);
 
+  // แยกจังหวะ status/sensor ไม่ให้ยิงพร้อมกันทุกรอบ
+  lastStatusMs = millis();
+  lastSensorMs = millis() - (SENSOR_INTERVAL_MS / 2);
+
   // testHealth(); // ปิดไว้เพื่อลดทราฟฟิกที่ไม่จำเป็น
 }
 
 void loop() {
   ensureWiFi();
+  handleNetworkAutoRecover();
 
   handlePumpAutoStop();
   handleMistAutoStop();
@@ -724,8 +904,13 @@ void loop() {
   }
 
   if (now - lastSensorMs >= SENSOR_INTERVAL_MS) {
-    lastSensorMs = now;
-    sendSensor();
+    bool sent = sendSensor();
+    if (sent) {
+      lastSensorMs = now;
+    } else if (pumpRunning) {
+      // ขณะปั๊มทำงานให้ลองใหม่ถี่ขึ้น เพื่อกลับมาอ่านทันทีหลังปั๊มหยุด
+      lastSensorMs = now - SENSOR_INTERVAL_MS + 1000UL;
+    }
   }
 
   if (now - lastPollMs >= POLL_INTERVAL_MS) {

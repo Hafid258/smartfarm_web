@@ -248,7 +248,16 @@ async function maybeNotifyAlertRules({ farm_id, metrics }) {
 // POST /api/device/sensor
 router.post("/sensor", async (req, res) => {
   try {
-    const { device_key, farm_id } = req.body;
+    const pick = (key) => {
+      const b = req.body?.[key];
+      if (b !== undefined && b !== null) return b;
+      const q = req.query?.[key];
+      if (q !== undefined && q !== null) return q;
+      return undefined;
+    };
+
+    const device_key = String(req.body?.device_key || req.query?.device_key || "").trim();
+    const farm_id = String(req.body?.farm_id || req.query?.farm_id || "").trim();
 
     if (!device_key) return res.status(400).json({ error: "device_key missing" });
     if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
@@ -260,17 +269,105 @@ router.post("/sensor", async (req, res) => {
       return res.status(403).json({ error: "Invalid device_key" });
     }
 
-    const ts = req.body.timestamp ? new Date(req.body.timestamp) : new Date();
+    const tsRaw = pick("timestamp");
+    const ts = tsRaw ? new Date(tsRaw) : new Date();
 
-    const temperature = Number(req.body.temperature ?? 0);
-    const humidity_air = Number(req.body.humidity_air ?? 0);
-    const soil_moisture = Number(req.body.soil_moisture ?? 0);
-    const soil_raw_adc = Number(req.body.soil_raw_adc ?? 0);
+    let temperature = Number(pick("temperature"));
+    let humidity_air = Number(pick("humidity_air"));
 
-    // ✅ แสง
-    const light_percent = Number(req.body.light_percent ?? 0);
-    const light_raw_adc = Number(req.body.light_raw_adc ?? 0);
-    const light_lux = req.body.light_lux !== undefined ? Number(req.body.light_lux) : null;
+    const soilMoistureRaw = pick("soil_moisture");
+    const soilRawAdcRaw = pick("soil_raw_adc");
+    const hasSoilMoisture = soilMoistureRaw !== null && soilMoistureRaw !== undefined;
+    const hasSoilRawAdc = soilRawAdcRaw !== null && soilRawAdcRaw !== undefined;
+    if (!hasSoilMoisture || !hasSoilRawAdc) {
+      return res.status(400).json({
+        error: "missing soil values",
+        detail: "soil_moisture and soil_raw_adc are required",
+      });
+    }
+
+    const soil_moisture = Number(soilMoistureRaw);
+    const soil_raw_adc = Number(soilRawAdcRaw);
+
+    // ✅ แสง (null = อ่านไม่ได้, ไม่บังคับให้เป็น 0)
+    const lightPercentRaw = pick("light_percent");
+    const lightRawAdcRaw = pick("light_raw_adc");
+    const lightLuxRaw = pick("light_lux");
+    const light_percent =
+      lightPercentRaw === null || lightPercentRaw === undefined
+        ? null
+        : Number(lightPercentRaw);
+    const light_raw_adc =
+      lightRawAdcRaw === null || lightRawAdcRaw === undefined
+        ? null
+        : Number(lightRawAdcRaw);
+    const light_lux =
+      lightLuxRaw === null || lightLuxRaw === undefined
+        ? null
+        : Number(lightLuxRaw);
+
+    // hard guard with fallback: ถ้าค่าหลุดเป็น NaN/Infinity ให้ยืมค่าล่าสุดที่ valid แทน
+    if (!Number.isFinite(temperature) || !Number.isFinite(humidity_air)) {
+      const prevValid = await SensorData.findOne({
+        ...farmQueryAnyType(farm_id),
+        temperature: { $type: "number" },
+        humidity_air: { $type: "number" },
+      })
+        .sort({ timestamp: -1 })
+        .lean();
+
+      if (prevValid) {
+        const tPrev = Number(prevValid.temperature);
+        const hPrev = Number(prevValid.humidity_air);
+        if (Number.isFinite(tPrev) && Number.isFinite(hPrev)) {
+          temperature = tPrev;
+          humidity_air = hPrev;
+          console.warn("DEVICE SENSOR WARN: invalid temp/rh from device, fallback to previous valid", {
+            farm_id: String(farm_id),
+            incoming_temperature: req.body.temperature,
+            incoming_humidity_air: req.body.humidity_air,
+            fallback_temperature: temperature,
+            fallback_humidity_air: humidity_air,
+          });
+        }
+      }
+    }
+    if (!Number.isFinite(temperature) || !Number.isFinite(humidity_air)) {
+      return res.status(400).json({
+        error: "invalid temperature/humidity_air",
+        detail: "temperature and humidity_air must be finite numbers",
+      });
+    }
+    if (!Number.isFinite(soil_moisture) || !Number.isFinite(soil_raw_adc)) {
+      return res.status(400).json({
+        error: "invalid soil values",
+        detail: "soil_moisture and soil_raw_adc must be finite numbers",
+      });
+    }
+    if (light_percent !== null && !Number.isFinite(light_percent)) {
+      return res.status(400).json({
+        error: "invalid light_percent",
+        detail: "light_percent must be null or a finite number",
+      });
+    }
+    if (light_raw_adc !== null && !Number.isFinite(light_raw_adc)) {
+      return res.status(400).json({
+        error: "invalid light_raw_adc",
+        detail: "light_raw_adc must be null or a finite number",
+      });
+    }
+    if (light_lux !== null && !Number.isFinite(light_lux)) {
+      return res.status(400).json({
+        error: "invalid light_lux",
+        detail: "light_lux must be null or a finite number",
+      });
+    }
+    if (humidity_air <= 0 || humidity_air > 100) {
+      return res.status(400).json({
+        error: "invalid humidity_air range",
+        detail: "humidity_air must be > 0 and <= 100 to compute indices",
+      });
+    }
 
     const storeFarmId = farmIdForStore(farm_id);
 
@@ -291,6 +388,12 @@ router.post("/sensor", async (req, res) => {
     const dew_point = calcDewPoint(temperature, humidity_air);
     const vpd = calcVPD(temperature, humidity_air);
     const gdd = calcGDD(temperature, 10);
+    if (!Number.isFinite(dew_point) || !Number.isFinite(vpd) || !Number.isFinite(gdd)) {
+      return res.status(400).json({
+        error: "invalid derived index values",
+        detail: "dew_point/vpd/gdd is not finite",
+      });
+    }
 
     const prev = await SensorData.findOne({
       ...farmQueryAnyType(farm_id),

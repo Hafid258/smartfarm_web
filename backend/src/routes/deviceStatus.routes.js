@@ -62,7 +62,7 @@ router.post("/status", resolveFarmId, async (req, res) => {
   try {
     const farm_id = req.farmId;
 
-    const device_key = String(req.body.device_key || "").trim();
+    const device_key = String(req.body?.device_key || req.query?.device_key || "").trim();
     if (!device_key) return res.status(400).json({ error: "device_key missing" });
 
     const setting = await ensureFarmSetting(farm_id, device_key);
@@ -76,13 +76,25 @@ router.post("/status", resolveFarmId, async (req, res) => {
     const update = {
       farm_id,
       device_key,
-      ip: String(req.body.ip || ""),
-      wifi_rssi: req.body.wifi_rssi ?? null,
-      fw_version: String(req.body.fw_version || ""),
-      pump_state: req.body.pump_state === "ON" ? "ON" : "OFF",
-      uptime_sec: req.body.uptime_sec ?? null,
       last_seen_at: new Date(),
     };
+
+    // อัปเดตเฉพาะค่าที่ส่งมา เพื่อไม่ให้ข้อมูลเดิมถูกเขียนทับเป็นค่าว่าง
+    if (req.body.ip !== undefined && req.body.ip !== null && String(req.body.ip).trim() !== "") {
+      update.ip = String(req.body.ip).trim();
+    }
+    if (req.body.wifi_rssi !== undefined && req.body.wifi_rssi !== null && Number.isFinite(Number(req.body.wifi_rssi))) {
+      update.wifi_rssi = Number(req.body.wifi_rssi);
+    }
+    if (req.body.fw_version !== undefined && req.body.fw_version !== null && String(req.body.fw_version).trim() !== "") {
+      update.fw_version = String(req.body.fw_version).trim();
+    }
+    if (req.body.pump_state !== undefined) {
+      update.pump_state = req.body.pump_state === "ON" ? "ON" : "OFF";
+    }
+    if (req.body.uptime_sec !== undefined && req.body.uptime_sec !== null && Number.isFinite(Number(req.body.uptime_sec))) {
+      update.uptime_sec = Number(req.body.uptime_sec);
+    }
 
     if (req.body.light_raw_adc !== undefined) update.light_raw_adc = Number(req.body.light_raw_adc);
     if (req.body.light_percent !== undefined) update.light_percent = Number(req.body.light_percent);

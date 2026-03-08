@@ -967,7 +967,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-8">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <SummaryCard title={<>อุณหภูมิอากาศ<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(latestShow?.temperature, 1)} status={statusTemp(latestShow?.temperature)} />
             <SummaryCard title={<>ความชื้นอากาศ<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.humidity_air, 0)} status={statusRH(latestShow?.humidity_air)} />
             <SummaryCard title={<>ความชื้นดิน<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.soil_moisture, 0)} status={statusSoil(latestShow?.soil_moisture)} />

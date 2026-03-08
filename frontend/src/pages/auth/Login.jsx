@@ -34,35 +34,59 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <form onSubmit={onSubmit} className="bg-white w-full max-w-md p-6 rounded-2xl shadow space-y-4">
-        <h1 className="text-2xl font-bold text-center">SmartFarm Login</h1>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
+      <div className="pointer-events-none absolute -top-16 -left-16 h-56 w-56 rounded-full bg-cyan-400/35 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 -right-10 h-72 w-72 rounded-full bg-emerald-400/25 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-0 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-blue-500/20 blur-3xl" />
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded">{error}</div>}
-
-        <input
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-
-        <input
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <button disabled={loading} className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
-          {loading ? "Logging in..." : "Login"}
-        </button>
-
-        <div className="text-sm text-center text-gray-600">
-          ยังไม่มีบัญชี? <Link to="/register" className="text-green-700 font-semibold">Register</Link>
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 hidden sm:block">
+          <div className="absolute left-[10%] top-[15%] h-28 w-28 rounded-2xl border border-white/20 bg-white/5 shadow-[0_22px_60px_rgba(0,0,0,0.35)] backdrop-blur-md [transform:rotate(-14deg)_translateZ(0)]" />
+          <div className="absolute right-[12%] bottom-[18%] h-24 w-24 rounded-full border border-cyan-200/40 bg-cyan-200/15 shadow-[0_16px_45px_rgba(34,211,238,0.35)]" />
         </div>
-      </form>
+
+        <form
+          onSubmit={onSubmit}
+          className="relative w-full max-w-md space-y-4 rounded-3xl border border-white/25 bg-white/12 p-6 text-slate-100 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-7"
+        >
+          <div className="space-y-1 text-center">
+            <h1 className="text-3xl font-extrabold tracking-tight">SmartFarm</h1>
+            <p className="text-sm text-slate-200/90">เข้าสู่ระบบควบคุมฟาร์มอัจฉริยะ</p>
+          </div>
+
+          {error && <div className="rounded-xl border border-red-300/40 bg-red-500/15 p-3 text-sm text-red-100">{error}</div>}
+
+          <input
+            className="w-full rounded-xl border border-white/25 bg-slate-900/45 px-3 py-2.5 text-white outline-none ring-cyan-300/50 placeholder:text-slate-300/80 focus:ring-2"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+
+          <input
+            className="w-full rounded-xl border border-white/25 bg-slate-900/45 px-3 py-2.5 text-white outline-none ring-cyan-300/50 placeholder:text-slate-300/80 focus:ring-2"
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <button
+            disabled={loading}
+            className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 py-2.5 font-semibold text-slate-900 shadow-[0_12px_30px_rgba(16,185,129,0.45)] transition hover:brightness-110 disabled:opacity-70"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+
+          <div className="text-center text-sm text-slate-200">
+            ยังไม่มีบัญชี?{" "}
+            <Link to="/register" className="font-semibold text-cyan-300 hover:text-cyan-200">
+              Register
+            </Link>
+          </div>
+          <div className="pointer-events-none absolute -inset-x-5 -bottom-5 -z-10 h-16 rounded-full bg-cyan-400/25 blur-2xl" />
+        </form>
+      </div>
     </div>
   );
 }
