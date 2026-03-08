@@ -77,7 +77,9 @@ export default function UserLayout() {
 
         {/* Content */}
         <main className="min-w-0">
-          <Outlet />
+          <div className="rounded-3xl border border-white/60 bg-white/35 p-3 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-[2px] sm:p-4">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

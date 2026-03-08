@@ -7,11 +7,11 @@ export default function Modal({ open, title, children, onClose }) {
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" />
 
       {/* Modal */}
       <div
-        className="relative bg-white w-[92%] max-w-xl rounded-2xl shadow-xl p-5"
+        className="relative w-[92%] max-w-xl rounded-2xl border border-white/40 bg-white/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.28)] backdrop-blur"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">
