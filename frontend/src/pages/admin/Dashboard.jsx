@@ -1016,23 +1016,35 @@ export default function Dashboard() {
         }}
       >
         <div className="space-y-4 text-slate-800">
+          <div className="text-sm text-gray-500">
+            เลือกช่วงข้อมูลที่ต้องการลบ แล้วพิมพ์ <b>DELETE</b> เพื่อยืนยัน
+          </div>
+
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             คำเตือน: การลบข้อมูลย้อนกลับไม่ได้ กรุณาตรวจสอบช่วงเวลาให้ถูกต้อง
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={deleteMode === "date" ? "secondary" : "outline"}
+            <button
               onClick={() => setDeleteMode("date")}
+              className={`px-3 py-2 rounded-xl text-sm border transition ${
+                deleteMode === "date"
+                  ? "bg-green-50 border-green-300 text-green-800"
+                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
             >
               ลบรายวัน
-            </Button>
-            <Button
-              variant={deleteMode === "month" ? "secondary" : "outline"}
+            </button>
+            <button
               onClick={() => setDeleteMode("month")}
+              className={`px-3 py-2 rounded-xl text-sm border transition ${
+                deleteMode === "month"
+                  ? "bg-green-50 border-green-300 text-green-800"
+                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
             >
               ลบรายเดือน
-            </Button>
+            </button>
           </div>
 
           {deleteMode === "date" ? (
