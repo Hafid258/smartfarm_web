@@ -329,8 +329,14 @@ export default function Dashboard() {
   const [openExportMenu, setOpenExportMenu] = useState(false);
   const [openExportModal, setOpenExportModal] = useState(false);
   const [openNotifModal, setOpenNotifModal] = useState(false);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [exportMode, setExportMode] = useState("single"); // single | all
   const [exportMonth, setExportMonth] = useState(""); // YYYY-MM
+  const [deleteMode, setDeleteMode] = useState("date"); // date | month
+  const [deleteDate, setDeleteDate] = useState("");
+  const [deleteMonth, setDeleteMonth] = useState("");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [exportOptions, setExportOptions] = useState({
     sensor: true,
     index: true,
@@ -853,6 +859,52 @@ export default function Dashboard() {
     }
   };
 
+  const deleteData = async () => {
+    if (!farmId) {
+      toast.error("กรุณาเลือกฟาร์มก่อนลบข้อมูล");
+      return;
+    }
+    if (deleteConfirmText.trim().toUpperCase() !== "DELETE") {
+      toast.error('กรุณาพิมพ์คำว่า DELETE เพื่อยืนยัน');
+      return;
+    }
+
+    try {
+      setDeleteBusy(true);
+      let res;
+      if (deleteMode === "date") {
+        if (!deleteDate) {
+          toast.error("กรุณาเลือกวันที่");
+          return;
+        }
+        res = await api.delete(
+          `/dashboard/data/by-date?farm_id=${encodeURIComponent(farmId)}&date=${encodeURIComponent(deleteDate)}`
+        );
+      } else {
+        if (!deleteMonth) {
+          toast.error("กรุณาเลือกเดือน");
+          return;
+        }
+        res = await api.delete(
+          `/dashboard/data/by-month?farm_id=${encodeURIComponent(farmId)}&month=${encodeURIComponent(deleteMonth)}`
+        );
+      }
+
+      const d = res?.data || {};
+      toast.success(
+        `ลบสำเร็จ: Sensor ${d.sensor_deleted || 0}, Index ${d.index_deleted || 0}, แจ้งเตือน ${d.notifications_deleted || 0}`
+      );
+      setOpenDeleteModal(false);
+      setDeleteConfirmText("");
+      await loadAll(false);
+      await loadExportMonths();
+    } catch (e) {
+      toast.error(pickError(e, "ลบข้อมูลไม่สำเร็จ"));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const metricModal = openMetric ? METRIC_INFO[openMetric] : null;
 
   return (
@@ -949,6 +1001,95 @@ export default function Dashboard() {
               {exportMode === "all" ? "ส่งออกทุกฟาร์ม" : "ส่งออกฟาร์มนี้"}
             </Button>
             <Button variant="outline" onClick={() => setOpenExportModal(false)}>
+              ยกเลิก
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={openDeleteModal}
+        title="ลบข้อมูลรายวัน/รายเดือน"
+        onClose={() => {
+          if (deleteBusy) return;
+          setOpenDeleteModal(false);
+        }}
+      >
+        <div className="space-y-4 text-slate-800">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            คำเตือน: การลบข้อมูลย้อนกลับไม่ได้ กรุณาตรวจสอบช่วงเวลาให้ถูกต้อง
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={deleteMode === "date" ? "secondary" : "outline"}
+              onClick={() => setDeleteMode("date")}
+            >
+              ลบรายวัน
+            </Button>
+            <Button
+              variant={deleteMode === "month" ? "secondary" : "outline"}
+              onClick={() => setDeleteMode("month")}
+            >
+              ลบรายเดือน
+            </Button>
+          </div>
+
+          {deleteMode === "date" ? (
+            <div>
+              <div className="text-sm text-gray-600 mb-1">เลือกวันที่ที่ต้องการลบ</div>
+              <select
+                value={deleteDate}
+                onChange={(e) => setDeleteDate(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm bg-white w-full"
+              >
+                <option value="">เลือกวันที่</option>
+                {availableDates.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <div className="text-sm text-gray-600 mb-1">เลือกเดือนที่ต้องการลบ</div>
+              <select
+                value={deleteMonth}
+                onChange={(e) => setDeleteMonth(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm bg-white w-full"
+              >
+                <option value="">เลือกเดือน</option>
+                {exportMonths.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <div className="text-sm text-gray-600 mb-1">พิมพ์ DELETE เพื่อยืนยัน</div>
+            <input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              className="border rounded-xl px-3 py-2 text-sm bg-white w-full"
+              placeholder="DELETE"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button variant="danger" onClick={deleteData} disabled={deleteBusy}>
+              {deleteBusy ? "กำลังลบ..." : "ยืนยันลบข้อมูล"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (deleteBusy) return;
+                setOpenDeleteModal(false);
+              }}
+            >
               ยกเลิก
             </Button>
           </div>
@@ -1071,6 +1212,10 @@ export default function Dashboard() {
                 </div>
               ) : null}
             </div>
+
+            <Button variant="danger" onClick={() => setOpenDeleteModal(true)}>
+              ลบข้อมูล
+            </Button>
           </div>
         </div>
 

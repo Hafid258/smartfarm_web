@@ -49,6 +49,24 @@ function calcGDD(t, baseTemp = 10) {
   return Math.max(0, t - baseTemp);
 }
 
+function dayRangeFromYmd(ymd) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ""))) return null;
+  const [y, m, d] = String(ymd).split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0, 0));
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  return { start, end };
+}
+
+function monthRangeFromYm(ym) {
+  if (!/^\d{4}-\d{2}$/.test(String(ym || ""))) return null;
+  const [y, m] = String(ym).split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0));
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  return { start, end };
+}
+
 async function distinctMonths(Model, farm_id, field) {
   const res = await Model.aggregate([
     { $match: { farm_id, [field]: { $type: "date" } } },
@@ -287,6 +305,76 @@ router.get("/available-months", async (req, res) => {
   } catch (err) {
     console.error("AVAILABLE MONTHS ERROR:", err);
     return res.status(500).json({ error: "Failed to fetch available months" });
+  }
+});
+
+/**
+ * ✅ DELETE /api/dashboard/data/by-date?farm_id=...&date=YYYY-MM-DD
+ * ลบข้อมูลรายวัน (admin only)
+ */
+router.delete("/data/by-date", async (req, res) => {
+  try {
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ error: "admin only" });
+    }
+
+    const farm_id = req.farmId;
+    const date = String(req.query.date || "").trim();
+    const range = dayRangeFromYmd(date);
+    if (!range) {
+      return res.status(400).json({ error: "invalid date format", detail: "use YYYY-MM-DD" });
+    }
+
+    const [sensorRes, indexRes, notifRes] = await Promise.all([
+      SensorData.deleteMany({ farm_id, timestamp: { $gte: range.start, $lt: range.end } }),
+      IndexData.deleteMany({ farm_id, timestamp: { $gte: range.start, $lt: range.end } }),
+      Notification.deleteMany({ farm_id, timestamp: { $gte: range.start, $lt: range.end } }),
+    ]);
+    const result = {
+      sensor_deleted: Number(sensorRes.deletedCount || 0),
+      index_deleted: Number(indexRes.deletedCount || 0),
+      notifications_deleted: Number(notifRes.deletedCount || 0),
+    };
+
+    return res.json({ ok: true, mode: "date", date, ...result });
+  } catch (err) {
+    console.error("DELETE BY DATE ERROR:", err);
+    return res.status(500).json({ error: "Failed to delete data by date" });
+  }
+});
+
+/**
+ * ✅ DELETE /api/dashboard/data/by-month?farm_id=...&month=YYYY-MM
+ * ลบข้อมูลรายเดือน (admin only)
+ */
+router.delete("/data/by-month", async (req, res) => {
+  try {
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ error: "admin only" });
+    }
+
+    const farm_id = req.farmId;
+    const month = String(req.query.month || "").trim();
+    const range = monthRangeFromYm(month);
+    if (!range) {
+      return res.status(400).json({ error: "invalid month format", detail: "use YYYY-MM" });
+    }
+
+    const [sensorRes, indexRes, notifRes] = await Promise.all([
+      SensorData.deleteMany({ farm_id, timestamp: { $gte: range.start, $lt: range.end } }),
+      IndexData.deleteMany({ farm_id, timestamp: { $gte: range.start, $lt: range.end } }),
+      Notification.deleteMany({ farm_id, timestamp: { $gte: range.start, $lt: range.end } }),
+    ]);
+    const result = {
+      sensor_deleted: Number(sensorRes.deletedCount || 0),
+      index_deleted: Number(indexRes.deletedCount || 0),
+      notifications_deleted: Number(notifRes.deletedCount || 0),
+    };
+
+    return res.json({ ok: true, mode: "month", month, ...result });
+  } catch (err) {
+    console.error("DELETE BY MONTH ERROR:", err);
+    return res.status(500).json({ error: "Failed to delete data by month" });
   }
 });
 
