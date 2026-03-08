@@ -23,12 +23,14 @@ export default function UserLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="relative min-h-screen overflow-hidden bg-transparent">
+      <div className="pointer-events-none absolute -top-16 left-0 h-56 w-56 rounded-full bg-emerald-300/25 blur-3xl" />
+      <div className="pointer-events-none absolute right-0 top-1/3 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl" />
       {/* Topbar */}
-      <div className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
+      <div className="sticky top-0 z-40 border-b border-white/60 bg-white/70 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-2xl bg-emerald-600" />
+            <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 shadow-[0_10px_24px_rgba(16,185,129,0.35)]" />
             <div>
               <div className="font-bold text-gray-900 leading-tight">SmartFarm</div>
               <div className="text-xs text-gray-500">โหมดผู้ปลูกผักบุ้ง</div>
@@ -43,7 +45,7 @@ export default function UserLayout() {
       <div className="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-[72px] h-fit">
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.1)] backdrop-blur-sm">
             <div className="text-xs font-semibold text-gray-500 mb-3">เมนู</div>
             <nav className="space-y-1">
               {links.map((l) => (
@@ -54,8 +56,8 @@ export default function UserLayout() {
                     cx(
                       "block rounded-xl px-3 py-2 text-sm transition",
                       isActive
-                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold"
-                        : "text-gray-700 hover:bg-gray-50 border border-transparent"
+                        ? "bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-900 border border-emerald-300/60 font-semibold shadow-[0_8px_20px_rgba(16,185,129,0.2)]"
+                        : "text-gray-700 hover:bg-white border border-transparent"
                     )
                   }
                 >
@@ -64,7 +66,7 @@ export default function UserLayout() {
               ))}
             </nav>
 
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="mt-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 p-4">
               <div className="text-sm font-semibold text-emerald-900">แนะนำสำหรับผักบุ้ง</div>
               <div className="text-sm text-emerald-800 mt-1">
                 ผักบุ้งชอบดินชื้นสม่ำเสมอ หากยังไม่มีข้อมูลจากเซนเซอร์ หน้าภาพรวมจะบอกว่า “ยังไม่มีข้อมูล”

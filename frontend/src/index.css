@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-slate-900 antialiased;
+    background:
+      radial-gradient(1200px 600px at 20% -20%, rgba(34, 211, 238, 0.18), transparent 60%),
+      radial-gradient(1000px 600px at 90% 10%, rgba(16, 185, 129, 0.12), transparent 62%),
+      linear-gradient(180deg, #f8fbff 0%, #f2f6fb 45%, #eef3f8 100%);
+  }
+}

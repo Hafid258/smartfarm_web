@@ -25,67 +25,79 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <form onSubmit={submit} className="bg-white w-full max-w-md p-6 rounded-2xl shadow space-y-4">
-        <h1 className="text-2xl font-bold text-center">Register</h1>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-8 sm:py-12">
+      <div className="pointer-events-none absolute -top-16 -left-16 h-56 w-56 rounded-full bg-cyan-400/30 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 -right-10 h-72 w-72 rounded-full bg-emerald-400/25 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-0 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-blue-500/20 blur-3xl" />
 
-        {msg && (
-          <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded">
-            ✅ {msg}
-          </div>
-        )}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded">
-            ❌ {error}
-          </div>
-        )}
-
-        <input
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Username"
-          value={form.username}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
-          required
-        />
-
-        <input
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          required
-        />
-
-        <input
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Phone"
-          value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-        />
-
-        <input
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Password"
-          type="password"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          required
-        />
-
-        <button
-          disabled={loading}
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg disabled:opacity-60"
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
+        <form
+          onSubmit={submit}
+          className="relative w-full max-w-md space-y-4 rounded-3xl border border-white/25 bg-white/12 p-6 text-slate-100 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:p-7"
         >
-          {loading ? "Submitting..." : "Register"}
-        </button>
+          <div className="space-y-1 text-center">
+            <h1 className="text-3xl font-extrabold tracking-tight">Register</h1>
+            <p className="text-sm text-slate-200/90">สร้างบัญชีเพื่อใช้งานระบบ SmartFarm</p>
+          </div>
 
-        <div className="text-sm text-center text-gray-600">
-          มีบัญชีแล้ว?{" "}
-          <Link to="/login" className="text-green-700 font-semibold">
-            Login
-          </Link>
-        </div>
-      </form>
+          {msg && (
+            <div className="rounded-xl border border-emerald-300/40 bg-emerald-500/15 p-3 text-sm text-emerald-100">
+              {msg}
+            </div>
+          )}
+          {error && (
+            <div className="rounded-xl border border-red-300/40 bg-red-500/15 p-3 text-sm text-red-100">
+              {error}
+            </div>
+          )}
+
+          <input
+            className="w-full rounded-xl border border-white/25 bg-slate-900/45 px-3 py-2.5 text-white outline-none ring-cyan-300/50 placeholder:text-slate-300/80 focus:ring-2"
+            placeholder="Username"
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            required
+          />
+
+          <input
+            className="w-full rounded-xl border border-white/25 bg-slate-900/45 px-3 py-2.5 text-white outline-none ring-cyan-300/50 placeholder:text-slate-300/80 focus:ring-2"
+            placeholder="Email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            required
+          />
+
+          <input
+            className="w-full rounded-xl border border-white/25 bg-slate-900/45 px-3 py-2.5 text-white outline-none ring-cyan-300/50 placeholder:text-slate-300/80 focus:ring-2"
+            placeholder="Phone"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          />
+
+          <input
+            className="w-full rounded-xl border border-white/25 bg-slate-900/45 px-3 py-2.5 text-white outline-none ring-cyan-300/50 placeholder:text-slate-300/80 focus:ring-2"
+            placeholder="Password"
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            required
+          />
+
+          <button
+            disabled={loading}
+            className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 py-2.5 font-semibold text-slate-900 shadow-[0_12px_30px_rgba(16,185,129,0.45)] transition hover:brightness-110 disabled:opacity-70"
+          >
+            {loading ? "Submitting..." : "Register"}
+          </button>
+
+          <div className="text-center text-sm text-slate-200">
+            มีบัญชีแล้ว?{" "}
+            <Link to="/login" className="font-semibold text-cyan-300 hover:text-cyan-200">
+              Login
+            </Link>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
