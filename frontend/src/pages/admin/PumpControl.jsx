@@ -104,7 +104,7 @@ export default function PumpControl() {
   const totalMin = usage.reduce((s, r) => s + Number(r.duration_sec || 0) / 60.0, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-slate-800">
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3">
           <div>

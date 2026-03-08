@@ -856,7 +856,7 @@ export default function Dashboard() {
   const metricModal = openMetric ? METRIC_INFO[openMetric] : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-800">
       {/* ✅ Popup อธิบายค่า */}
       <Modal
         open={!!openMetric}
@@ -879,7 +879,7 @@ export default function Dashboard() {
         title="เลือกข้อมูลที่จะส่งออก"
         onClose={() => setOpenExportModal(false)}
       >
-        <div className="space-y-4">
+        <div className="space-y-4 text-slate-800">
           <div className="text-sm text-gray-600">
             {exportMode === "all"
               ? "ส่งออกทุกฟาร์ม (เลือกได้เฉพาะ Sensor/Index)"

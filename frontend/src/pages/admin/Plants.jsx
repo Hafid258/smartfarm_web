@@ -89,7 +89,7 @@ export default function Plants() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-slate-800">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-2xl font-bold text-gray-900">ข้อมูลพืช</div>

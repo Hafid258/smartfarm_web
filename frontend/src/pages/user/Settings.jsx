@@ -158,7 +158,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-slate-800">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-2xl font-bold text-gray-900">ตั้งค่าระบบ</div>
@@ -189,8 +189,8 @@ export default function Settings() {
         )}
 
         {!loading && !err && (
-          <div className="space-y-5">
-            <div className="space-y-4">
+          <div className="space-y-5 text-slate-800">
+            <div className="space-y-4 text-slate-800">
               <div className="flex items-center justify-between">
                 <div className="text-lg font-semibold text-gray-900">ระบบอัตโนมัติ</div>
                 <Badge variant="blue">อัตโนมัติ</Badge>
@@ -266,7 +266,7 @@ export default function Settings() {
               {form.watering_schedules.length === 0 ? (
                 <div className="text-sm text-gray-500">ยังไม่มีการตั้งเวลา</div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 text-slate-800">
                   {form.watering_schedules.map((s, idx) => (
                     <div key={idx} className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -102,7 +102,7 @@ export default function Profile() {
   }, []);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-slate-800">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>

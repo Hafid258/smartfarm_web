@@ -657,7 +657,7 @@ export default function Dashboard() {
   ]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-slate-800">
       <Modal
         open={openNotifModal}
         title={`แจ้งเตือนล่าสุด (${notifs.length})`}
@@ -684,7 +684,7 @@ export default function Dashboard() {
       </Modal>
 
       <Modal open={openExportModal} title="เลือกข้อมูลที่จะส่งออก" onClose={() => setOpenExportModal(false)}>
-        <div className="space-y-4">
+        <div className="space-y-4 text-slate-800">
           <div>
             <div className="text-sm text-gray-600 mb-1">เลือกเดือน (เฉพาะเดือนที่มีข้อมูล)</div>
             <div className="flex flex-wrap gap-2 items-center">

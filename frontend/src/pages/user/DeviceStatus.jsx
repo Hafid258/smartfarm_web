@@ -149,7 +149,7 @@ export default function DeviceStatus() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-800">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-2xl font-bold text-gray-900">สถานะอุปกรณ์</div>

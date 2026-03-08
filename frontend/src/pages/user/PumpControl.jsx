@@ -45,7 +45,7 @@ export default function PumpControl() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-slate-800">
       <Card className="p-4">
         <div className="text-lg font-semibold">ควบคุมปั๊มน้ำ</div>
         <div className="text-sm text-gray-500 mb-3">สั่ง ON/OFF และกำหนดเวลา (วินาที)</div>

@@ -171,7 +171,7 @@ export default function DeviceStatus() {
   }, [farms, farmId]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-800">
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>

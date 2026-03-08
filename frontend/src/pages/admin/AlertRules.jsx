@@ -205,7 +205,7 @@ export default function AlertRules() {
   const activeCount = useMemo(() => rules.filter((r) => r.enabled).length, [rules]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-800">
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
