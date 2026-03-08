@@ -995,9 +995,9 @@ export default function Dashboard() {
           <div className="flex flex-wrap gap-2 justify-end">
             <Button
               variant="outline"
-              onClick={() => setOpenChartPicker((v) => !v)}
+              onClick={() => setOpenChartPicker(true)}
             >
-              {openChartPicker ? "ปิดรายการกราฟ" : "เลือกกราฟที่อยากดู"}
+              เลือกกราฟที่อยากดู
             </Button>
 
             <Button
@@ -1277,57 +1277,53 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* ✅ แผงเลือกกราฟ (กดปุ่มแล้วค่อยเปิด) */}
-          {openChartPicker ? (
-            <Card className="p-5">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-lg font-bold text-gray-900">
-                    เลือกกราฟที่อยากดู
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    กดเพื่อเปิด/ปิดกราฟ ระบบจะจำไว้ให้
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={selectAllCharts}>
-                    เลือกทั้งหมด
-                  </Button>
-                  <Button variant="outline" onClick={clearCharts}>
-                    ซ่อนทั้งหมด
-                  </Button>
-                  <Button variant="outline" onClick={resetCharts}>
-                    ค่าเริ่มต้น
-                  </Button>
-                </div>
+          <Modal
+            open={openChartPicker}
+            onClose={() => setOpenChartPicker(false)}
+            title="เลือกกราฟที่อยากดู"
+          >
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-gray-500">
+                กดเพื่อเปิด/ปิดกราฟ ระบบจะจำไว้ให้
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {CHARTS.map((c) => {
-                  const active = visibleCharts.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => toggleChart(c.id)}
-                      className={`px-3 py-2 rounded-xl text-sm border transition ${
-                        active
-                          ? "bg-green-50 border-green-300 text-green-800"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {active ? "✅ " : "➕ "}
-                      {c.label}
-                    </button>
-                  );
-                })}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={selectAllCharts}>
+                  เลือกทั้งหมด
+                </Button>
+                <Button variant="outline" onClick={clearCharts}>
+                  ซ่อนทั้งหมด
+                </Button>
+                <Button variant="outline" onClick={resetCharts}>
+                  ค่าเริ่มต้น
+                </Button>
               </div>
+            </div>
 
-              <div className="mt-3 text-xs text-gray-500">
-                แสดงอยู่ <b>{visibleCharts.length}</b> / {CHARTS.length} กราฟ
-              </div>
-            </Card>
-          ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {CHARTS.map((c) => {
+                const active = visibleCharts.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => toggleChart(c.id)}
+                    className={`px-3 py-2 rounded-xl text-sm border transition ${
+                      active
+                        ? "bg-green-50 border-green-300 text-green-800"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {active ? "✅ " : "➕ "}
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 text-xs text-gray-500">
+              แสดงอยู่ <b>{visibleCharts.length}</b> / {CHARTS.length} กราฟ
+            </div>
+          </Modal>
 
           {/* ✅ Charts */}
           <div className="grid gap-4 lg:grid-cols-2">
