@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -23,20 +24,48 @@ function to24Hour(hh12, ampm) {
 }
 
 export default function ClockTimePicker({ label, value, onChange }) {
-  const rootRef = useRef(null);
+  const panelRef = useRef(null);
+  const buttonRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("hour");
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
 
   const parsed = useMemo(() => parseTime(value), [value]);
   const hour12 = to12Hour(parsed.hh);
 
+  const updatePanelPos = () => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const panelWidth = 280;
+    const gutter = 12;
+    const maxLeft = Math.max(gutter, window.innerWidth - panelWidth - gutter);
+    const nextLeft = Math.min(Math.max(rect.left, gutter), maxLeft);
+    setPanelPos({
+      top: rect.bottom + 8,
+      left: nextLeft,
+    });
+  };
+
   useEffect(() => {
     if (!open) return;
+    updatePanelPos();
+
     const onDown = (ev) => {
-      if (!rootRef.current?.contains(ev.target)) setOpen(false);
+      const insidePanel = panelRef.current?.contains(ev.target);
+      const insideButton = buttonRef.current?.contains(ev.target);
+      if (!insidePanel && !insideButton) setOpen(false);
     };
+    const onReflow = () => updatePanelPos();
+
     window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
+    window.addEventListener("resize", onReflow);
+    window.addEventListener("scroll", onReflow, true);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("resize", onReflow);
+      window.removeEventListener("scroll", onReflow, true);
+    };
   }, [open]);
 
   const setHour12 = (selected12) => {
@@ -62,9 +91,10 @@ export default function ClockTimePicker({ label, value, onChange }) {
   const selectedForDial = step === "hour" ? hour12.h : Math.round(parsed.mm / 5) * 5;
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <div className="mb-1 text-xs text-slate-600">{label}</div>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => {
           setOpen((v) => !v);
@@ -75,8 +105,13 @@ export default function ClockTimePicker({ label, value, onChange }) {
         {value || "--:--"}
       </button>
 
-      {open ? (
-        <div className="absolute z-50 mt-2 w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_20px_40px_rgba(15,23,42,0.2)]">
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="fixed z-[90] w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_20px_40px_rgba(15,23,42,0.2)]"
+              style={{ top: panelPos.top, left: panelPos.left }}
+            >
           <div className="mb-3 flex items-center justify-between">
             <div className="text-sm font-semibold text-slate-800">{label}</div>
             <button
@@ -158,8 +193,10 @@ export default function ClockTimePicker({ label, value, onChange }) {
               );
             })}
           </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
