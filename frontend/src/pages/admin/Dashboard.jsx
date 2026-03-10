@@ -323,6 +323,7 @@ export default function Dashboard() {
   // ✅ วันที่เลือก (เลือกจากวันที่มีข้อมูลเท่านั้น)
   const [selectedDate, setSelectedDate] = useState("");
   const [lockAllDates, setLockAllDates] = useState(false);
+  const [timeRange, setTimeRange] = useState("all"); // all | 1h | 3h | 6h | 12h | 24h | 72h
 
   // ✅ ปุ่ม/เมนู UI ใหม่
   const [openChartPicker, setOpenChartPicker] = useState(false);
@@ -533,14 +534,30 @@ export default function Dashboard() {
      ✅ Filter ตามวันที่เลือก
      =========================== */
   const filteredHistory = useMemo(() => {
-    if (!selectedDate) return history;
-    return history.filter((x) => isSameDay(x.timestamp, selectedDate));
-  }, [history, selectedDate]);
+    let list = !selectedDate ? history : history.filter((x) => isSameDay(x.timestamp, selectedDate));
+    if (timeRange === "all") return list;
+    const hours = Number(String(timeRange).replace("h", ""));
+    if (!Number.isFinite(hours) || hours <= 0) return list;
+    const cutoff = Date.now() - hours * 60 * 60 * 1000;
+    return list.filter((x) => {
+      const ts = new Date(x?.timestamp || 0).getTime();
+      return Number.isFinite(ts) && ts >= cutoff;
+    });
+  }, [history, selectedDate, timeRange]);
 
   const filteredIndexHistory = useMemo(() => {
-    if (!selectedDate) return indexHistory;
-    return indexHistory.filter((x) => isSameDay(x.timestamp, selectedDate));
-  }, [indexHistory, selectedDate]);
+    let list = !selectedDate
+      ? indexHistory
+      : indexHistory.filter((x) => isSameDay(x.timestamp, selectedDate));
+    if (timeRange === "all") return list;
+    const hours = Number(String(timeRange).replace("h", ""));
+    if (!Number.isFinite(hours) || hours <= 0) return list;
+    const cutoff = Date.now() - hours * 60 * 60 * 1000;
+    return list.filter((x) => {
+      const ts = new Date(x?.timestamp || 0).getTime();
+      return Number.isFinite(ts) && ts >= cutoff;
+    });
+  }, [indexHistory, selectedDate, timeRange]);
 
   const chartHistory = useMemo(() => {
     return filteredHistory.map((x) => ({
@@ -551,24 +568,24 @@ export default function Dashboard() {
 
   // ✅ latest ของวันนั้น (เอาค่าล่าสุดของวัน)
   const latestShow = useMemo(() => {
-    if (!selectedDate) return latest;
+    if (!selectedDate && timeRange === "all") return latest;
     if (!filteredHistory.length) return null;
 
     const sorted = [...filteredHistory].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
     return sorted[0];
-  }, [selectedDate, latest, filteredHistory]);
+  }, [selectedDate, timeRange, latest, filteredHistory]);
 
   const indexLatestShow = useMemo(() => {
-    if (!selectedDate) return indexLatest;
+    if (!selectedDate && timeRange === "all") return indexLatest;
     if (!filteredIndexHistory.length) return null;
 
     const sorted = [...filteredIndexHistory].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
     return sorted[0];
-  }, [selectedDate, indexLatest, filteredIndexHistory]);
+  }, [selectedDate, timeRange, indexLatest, filteredIndexHistory]);
 
   const schedules = useMemo(() => normalizeSchedules(settings), [settings]);
 
@@ -1261,8 +1278,23 @@ export default function Dashboard() {
                 {availableDates.map((d) => (
                   <option key={d} value={d}>
                     {d}
-                  </option>
-                ))}
+                </option>
+              ))}
+              </select>
+
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm bg-white"
+                title="เลือกช่วงเวลา"
+              >
+                <option value="all">ทุกช่วงเวลา</option>
+                <option value="1h">ย้อนหลัง 1 ชั่วโมง</option>
+                <option value="3h">ย้อนหลัง 3 ชั่วโมง</option>
+                <option value="6h">ย้อนหลัง 6 ชั่วโมง</option>
+                <option value="12h">ย้อนหลัง 12 ชั่วโมง</option>
+                <option value="24h">ย้อนหลัง 24 ชั่วโมง</option>
+                <option value="72h">ย้อนหลัง 72 ชั่วโมง</option>
               </select>
 
               <Button
@@ -1289,6 +1321,7 @@ export default function Dashboard() {
                 onClick={() => {
                   setSelectedDate("");
                   setLockAllDates(true);
+                  setTimeRange("all");
                 }}
               >
                 ล้าง
@@ -1315,6 +1348,9 @@ export default function Dashboard() {
             ) : (
               <>📅 กำลังแสดงข้อมูลแบบรวม</>
             )}
+            {timeRange !== "all" ? (
+              <> | ⏱️ ช่วงเวลา <b>{timeRange.replace("h", " ชั่วโมง")}</b></>
+            ) : null}
           </div>
         </Card>
       </div>
