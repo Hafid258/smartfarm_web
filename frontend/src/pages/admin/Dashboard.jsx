@@ -323,7 +323,9 @@ export default function Dashboard() {
   // ✅ วันที่เลือก (เลือกจากวันที่มีข้อมูลเท่านั้น)
   const [selectedDate, setSelectedDate] = useState("");
   const [lockAllDates, setLockAllDates] = useState(false);
-  const [timeRange, setTimeRange] = useState("all"); // all | 1h | 3h | 6h | 12h | 24h | 72h
+  const [timeRange, setTimeRange] = useState("all"); // all | 1h | 3h | 6h | 12h | 24h | 72h | custom
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   // ✅ ปุ่ม/เมนู UI ใหม่
   const [openChartPicker, setOpenChartPicker] = useState(false);
@@ -536,6 +538,14 @@ export default function Dashboard() {
   const filteredHistory = useMemo(() => {
     let list = !selectedDate ? history : history.filter((x) => isSameDay(x.timestamp, selectedDate));
     if (timeRange === "all") return list;
+    if (timeRange === "custom") {
+      const fromTs = customFrom ? new Date(customFrom).getTime() : Number.NEGATIVE_INFINITY;
+      const toTs = customTo ? new Date(customTo).getTime() : Number.POSITIVE_INFINITY;
+      return list.filter((x) => {
+        const ts = new Date(x?.timestamp || 0).getTime();
+        return Number.isFinite(ts) && ts >= fromTs && ts <= toTs;
+      });
+    }
     const hours = Number(String(timeRange).replace("h", ""));
     if (!Number.isFinite(hours) || hours <= 0) return list;
     const cutoff = Date.now() - hours * 60 * 60 * 1000;
@@ -543,13 +553,21 @@ export default function Dashboard() {
       const ts = new Date(x?.timestamp || 0).getTime();
       return Number.isFinite(ts) && ts >= cutoff;
     });
-  }, [history, selectedDate, timeRange]);
+  }, [history, selectedDate, timeRange, customFrom, customTo]);
 
   const filteredIndexHistory = useMemo(() => {
     let list = !selectedDate
       ? indexHistory
       : indexHistory.filter((x) => isSameDay(x.timestamp, selectedDate));
     if (timeRange === "all") return list;
+    if (timeRange === "custom") {
+      const fromTs = customFrom ? new Date(customFrom).getTime() : Number.NEGATIVE_INFINITY;
+      const toTs = customTo ? new Date(customTo).getTime() : Number.POSITIVE_INFINITY;
+      return list.filter((x) => {
+        const ts = new Date(x?.timestamp || 0).getTime();
+        return Number.isFinite(ts) && ts >= fromTs && ts <= toTs;
+      });
+    }
     const hours = Number(String(timeRange).replace("h", ""));
     if (!Number.isFinite(hours) || hours <= 0) return list;
     const cutoff = Date.now() - hours * 60 * 60 * 1000;
@@ -557,7 +575,7 @@ export default function Dashboard() {
       const ts = new Date(x?.timestamp || 0).getTime();
       return Number.isFinite(ts) && ts >= cutoff;
     });
-  }, [indexHistory, selectedDate, timeRange]);
+  }, [indexHistory, selectedDate, timeRange, customFrom, customTo]);
 
   const chartHistory = useMemo(() => {
     return filteredHistory.map((x) => ({
@@ -1295,7 +1313,27 @@ export default function Dashboard() {
                 <option value="12h">ย้อนหลัง 12 ชั่วโมง</option>
                 <option value="24h">ย้อนหลัง 24 ชั่วโมง</option>
                 <option value="72h">ย้อนหลัง 72 ชั่วโมง</option>
+                <option value="custom">กำหนดเอง</option>
               </select>
+
+              {timeRange === "custom" ? (
+                <>
+                  <input
+                    type="datetime-local"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="border rounded-xl px-3 py-2 text-sm bg-white"
+                    title="เวลาเริ่มต้น"
+                  />
+                  <input
+                    type="datetime-local"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="border rounded-xl px-3 py-2 text-sm bg-white"
+                    title="เวลาสิ้นสุด"
+                  />
+                </>
+              ) : null}
 
               <Button
                 variant="outline"
@@ -1322,6 +1360,8 @@ export default function Dashboard() {
                   setSelectedDate("");
                   setLockAllDates(true);
                   setTimeRange("all");
+                  setCustomFrom("");
+                  setCustomTo("");
                 }}
               >
                 ล้าง
@@ -1349,7 +1389,19 @@ export default function Dashboard() {
               <>📅 กำลังแสดงข้อมูลแบบรวม</>
             )}
             {timeRange !== "all" ? (
-              <> | ⏱️ ช่วงเวลา <b>{timeRange.replace("h", " ชั่วโมง")}</b></>
+              timeRange === "custom" ? (
+                <>
+                  {" "}
+                  | ⏱️ ช่วงเวลา{" "}
+                  <b>
+                    {customFrom || customTo
+                      ? `${customFrom || "..."} ถึง ${customTo || "..."}`
+                      : "กำหนดเอง"}
+                  </b>
+                </>
+              ) : (
+                <> | ⏱️ ช่วงเวลา <b>{timeRange.replace("h", " ชั่วโมง")}</b></>
+              )
             ) : null}
           </div>
         </Card>
