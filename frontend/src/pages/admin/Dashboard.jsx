@@ -9,6 +9,7 @@ import { useToast } from "../../components/ui/ToastProvider.jsx";
 import SummaryCard from "../../components/SummaryCard.jsx";
 import LineChartCard from "../../components/LineChartCard.jsx";
 import Modal from "../../components/ui/Modal.jsx";
+import ClockTimePicker from "../../components/ui/ClockTimePicker.jsx";
 
 // ✅ Excel Export
 import * as XLSX from "xlsx";
@@ -1339,22 +1340,18 @@ export default function Dashboard() {
               </select>
 
               {timeRange === "custom" ? (
-                <>
-                  <input
-                    type="time"
+                <div className="flex flex-wrap gap-2">
+                  <ClockTimePicker
+                    label="เวลาเริ่มต้น"
                     value={customFrom}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="border rounded-xl px-3 py-2 text-sm bg-white"
-                    title="เวลาเริ่มต้น"
+                    onChange={setCustomFrom}
                   />
-                  <input
-                    type="time"
+                  <ClockTimePicker
+                    label="เวลาสิ้นสุด"
                     value={customTo}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="border rounded-xl px-3 py-2 text-sm bg-white"
-                    title="เวลาสิ้นสุด"
+                    onChange={setCustomTo}
                   />
-                </>
+                </div>
               ) : null}
 
               <Button
