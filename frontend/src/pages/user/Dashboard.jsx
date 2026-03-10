@@ -149,6 +149,14 @@ function monthRange(monthStr) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
+function parseTimeToMinutes(v) {
+  if (!v || typeof v !== "string") return null;
+  const [hh, mm] = v.split(":").map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return hh * 60 + mm;
+}
+
 const CHARTS = [
   { id: "temperature", label: "อุณหภูมิอากาศ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
   { id: "humidity_air", label: "ความชื้นอากาศ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
@@ -408,11 +416,18 @@ export default function Dashboard() {
       : sensorHistory.filter((x) => isSameDay(x.timestamp, selectedDate));
     if (timeRange === "all") return list;
     if (timeRange === "custom") {
-      const fromTs = customFrom ? new Date(customFrom).getTime() : Number.NEGATIVE_INFINITY;
-      const toTs = customTo ? new Date(customTo).getTime() : Number.POSITIVE_INFINITY;
+      const fromMin = parseTimeToMinutes(customFrom);
+      const toMin = parseTimeToMinutes(customTo);
       return list.filter((x) => {
         const ts = new Date(x?.timestamp || 0).getTime();
-        return Number.isFinite(ts) && ts >= fromTs && ts <= toTs;
+        if (!Number.isFinite(ts)) return false;
+        const d = new Date(ts);
+        const at = d.getHours() * 60 + d.getMinutes();
+        if (fromMin === null && toMin === null) return true;
+        if (fromMin !== null && toMin === null) return at >= fromMin;
+        if (fromMin === null && toMin !== null) return at <= toMin;
+        if (fromMin <= toMin) return at >= fromMin && at <= toMin;
+        return at >= fromMin || at <= toMin;
       });
     }
     const hours = Number(String(timeRange).replace("h", ""));
@@ -430,11 +445,18 @@ export default function Dashboard() {
       : indexHistory.filter((x) => isSameDay(x.timestamp, selectedDate));
     if (timeRange === "all") return list;
     if (timeRange === "custom") {
-      const fromTs = customFrom ? new Date(customFrom).getTime() : Number.NEGATIVE_INFINITY;
-      const toTs = customTo ? new Date(customTo).getTime() : Number.POSITIVE_INFINITY;
+      const fromMin = parseTimeToMinutes(customFrom);
+      const toMin = parseTimeToMinutes(customTo);
       return list.filter((x) => {
         const ts = new Date(x?.timestamp || 0).getTime();
-        return Number.isFinite(ts) && ts >= fromTs && ts <= toTs;
+        if (!Number.isFinite(ts)) return false;
+        const d = new Date(ts);
+        const at = d.getHours() * 60 + d.getMinutes();
+        if (fromMin === null && toMin === null) return true;
+        if (fromMin !== null && toMin === null) return at >= fromMin;
+        if (fromMin === null && toMin !== null) return at <= toMin;
+        if (fromMin <= toMin) return at >= fromMin && at <= toMin;
+        return at >= fromMin || at <= toMin;
       });
     }
     const hours = Number(String(timeRange).replace("h", ""));
@@ -951,14 +973,14 @@ export default function Dashboard() {
             {timeRange === "custom" ? (
               <>
                 <input
-                  type="datetime-local"
+                  type="time"
                   value={customFrom}
                   onChange={(e) => setCustomFrom(e.target.value)}
                   className="border rounded-xl px-3 py-2 text-sm bg-white"
                   title="เวลาเริ่มต้น"
                 />
                 <input
-                  type="datetime-local"
+                  type="time"
                   value={customTo}
                   onChange={(e) => setCustomTo(e.target.value)}
                   className="border rounded-xl px-3 py-2 text-sm bg-white"
