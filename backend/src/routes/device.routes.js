@@ -31,6 +31,40 @@ function farmIdForStore(farm_id) {
   return oid || String(farm_id);
 }
 
+function normalizeKey(v) {
+  return String(v || "").trim();
+}
+
+function keyFieldByRole(role) {
+  return role === "sensor" ? "sensor_device_key" : "control_device_key";
+}
+
+async function verifyAndSeedRoleKey({ farm_id, setting, device_key, role }) {
+  if (!setting) return { ok: false, code: 400, error: "FarmSetting not found" };
+
+  const incoming = normalizeKey(device_key);
+  const roleField = keyFieldByRole(role);
+  const roleKey = normalizeKey(setting?.[roleField]);
+  const legacyKey = normalizeKey(setting?.device_key);
+
+  if (roleKey) {
+    if (roleKey !== incoming) {
+      return { ok: false, code: 403, error: `Invalid ${role}_device_key` };
+    }
+    return { ok: true };
+  }
+
+  // First registration for this role: allow seeding role key.
+  // Keep legacy key untouched if it already exists.
+  const setPayload = { [roleField]: incoming, updated_at: new Date() };
+  if (!legacyKey) setPayload.device_key = incoming;
+  await FarmSetting.updateOne(
+    farmQueryAnyType(farm_id),
+    { $set: setPayload }
+  );
+  return { ok: true };
+}
+
 // Dew Point (°C)
 function calcDewPoint(t, rh) {
   const a = 17.27;
@@ -265,9 +299,13 @@ router.post("/sensor", async (req, res) => {
     const setting = await FarmSetting.findOne(farmQueryAnyType(farm_id)).lean();
     if (!setting) return res.status(400).json({ error: "FarmSetting not found" });
 
-    if (!setting.device_key || String(setting.device_key) !== String(device_key)) {
-      return res.status(403).json({ error: "Invalid device_key" });
-    }
+    const auth = await verifyAndSeedRoleKey({
+      farm_id,
+      setting,
+      device_key,
+      role: "sensor",
+    });
+    if (!auth.ok) return res.status(auth.code).json({ error: auth.error });
 
     const tsRaw = pick("timestamp");
     const ts = tsRaw ? new Date(tsRaw) : new Date();
@@ -468,9 +506,13 @@ router.get("/commands/poll", async (req, res) => {
     const setting = await FarmSetting.findOne(farmQueryAnyType(farm_id)).lean();
     if (!setting) return res.status(400).json({ error: "FarmSetting not found" });
 
-    if (!setting.device_key || String(setting.device_key) !== String(device_key)) {
-      return res.status(403).json({ error: "Invalid device_key" });
-    }
+    const auth = await verifyAndSeedRoleKey({
+      farm_id,
+      setting,
+      device_key,
+      role: "control",
+    });
+    if (!auth.ok) return res.status(auth.code).json({ error: auth.error });
 
     const cmd = await DeviceCommand.findOne({
       ...farmQueryAnyType(farm_id),
@@ -511,9 +553,13 @@ router.post("/commands/ack", async (req, res) => {
     const setting = await FarmSetting.findOne(farmQueryAnyType(farm_id)).lean();
     if (!setting) return res.status(400).json({ error: "FarmSetting not found" });
 
-    if (!setting.device_key || String(setting.device_key) !== String(device_key)) {
-      return res.status(403).json({ error: "Invalid device_key" });
-    }
+    const auth = await verifyAndSeedRoleKey({
+      farm_id,
+      setting,
+      device_key,
+      role: "control",
+    });
+    if (!auth.ok) return res.status(auth.code).json({ error: auth.error });
 
     const nextStatus = status === "failed" ? "failed" : "done";
 

@@ -42,6 +42,10 @@ function pickValue(incoming, current, fallback) {
   return fallback;
 }
 
+function normalizeKey(v) {
+  return String(v || "").trim();
+}
+
 // GET /api/settings/my
 router.get("/my", async (req, res) => {
   try {
@@ -62,14 +66,31 @@ router.post("/my", async (req, res) => {
     if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
 
     const existing = await FarmSetting.findOne({ farm_id }).lean();
-    const incomingKey = String(req.body.device_key || "").trim();
-    const device_key =
-      incomingKey ||
-      String(existing?.device_key || "").trim() ||
-      crypto.randomBytes(12).toString("hex");
+
+    const currentLegacy = normalizeKey(existing?.device_key);
+    const currentSensor = normalizeKey(existing?.sensor_device_key);
+    const currentControl = normalizeKey(existing?.control_device_key);
+
+    const incomingLegacy = normalizeKey(req.body.device_key);
+    const incomingSensor = normalizeKey(req.body.sensor_device_key);
+    const incomingControl = normalizeKey(req.body.control_device_key);
+
+    const generated = crypto.randomBytes(12).toString("hex");
+    const device_key = incomingLegacy || currentLegacy || generated;
+
+    let sensor_device_key = incomingSensor || currentSensor || device_key;
+    let control_device_key = incomingControl || currentControl || device_key;
+
+    // Legacy UI that only sends device_key keeps single-key behavior by default.
+    if (incomingLegacy && !incomingSensor && !incomingControl) {
+      sensor_device_key = currentSensor || device_key;
+      control_device_key = currentControl || device_key;
+    }
 
     const payload = {
       device_key,
+      sensor_device_key,
+      control_device_key,
 
       pump_flow_rate_lpm: Number(
         pickValue(req.body.pump_flow_rate_lpm, existing?.pump_flow_rate_lpm, 0)

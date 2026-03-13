@@ -6,6 +6,7 @@ const DeviceStatusSchema = new mongoose.Schema(
 
     // ✅ key ของอุปกรณ์ (ผูกกับ FarmSetting หรือให้แต่ละ device มี key ของตัวเองก็ได้)
     device_key: { type: String, required: true, index: true },
+    device_role: { type: String, enum: ["sensor", "control", "unknown"], default: "unknown" },
 
     ip: { type: String, default: "" },
     wifi_rssi: { type: Number, default: null },

@@ -14,8 +14,12 @@ const schema = new mongoose.Schema(
   {
     farm_id: { type: mongoose.Schema.Types.ObjectId, ref: "Farm", required: true, unique: true },
 
-    // device key ที่ ESP32 ต้องส่งมาให้ตรง
+    // legacy key (single device mode)
     device_key: { type: String, default: "123456789" },
+
+    // split device mode (sensor/control)
+    sensor_device_key: { type: String, default: "" },
+    control_device_key: { type: String, default: "" },
 
     // thresholds (รองรับทั้งชื่อเก่า/ใหม่)
     temp_threshold: { type: Number, default: 35 },

@@ -6,6 +6,20 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
 
+function normalizeKey(v) {
+  return String(v || "").trim();
+}
+
+function normalizeDeviceRole(v) {
+  const role = String(v || "").trim().toLowerCase();
+  if (role === "sensor" || role === "control") return role;
+  return "";
+}
+
+function keyFieldByRole(role) {
+  return role === "sensor" ? "sensor_device_key" : "control_device_key";
+}
+
 async function ensureFarmSetting(farm_id, device_key) {
   await FarmSetting.findOneAndUpdate(
     { farm_id },
@@ -33,7 +47,9 @@ async function ensureFarmSetting(farm_id, device_key) {
         sampling_interval_min: 5,
 
         // Device auth
-        device_key: String(device_key || ""),
+        device_key: normalizeKey(device_key),
+        sensor_device_key: "",
+        control_device_key: "",
 
         // Audit
         updated_at: new Date(),
@@ -45,14 +61,43 @@ async function ensureFarmSetting(farm_id, device_key) {
   return await FarmSetting.findOne({ farm_id }).lean();
 }
 
-function verifyDeviceKey(setting, device_key) {
-  if (!setting) return { ok: false, code: 400, error: "FarmSetting not found" };
+async function verifyAndSeedRoleKey({ farm_id, setting, device_key, role }) {
+  if (!setting) return { ok: false, code: 400, error: "FarmSetting not found", role: "unknown" };
 
-  if (!setting.device_key || String(setting.device_key).trim() === "") return { ok: true, firstSet: true };
+  const incoming = normalizeKey(device_key);
+  const roleField = keyFieldByRole(role);
+  const roleKey = normalizeKey(setting?.[roleField]);
+  const legacyKey = normalizeKey(setting?.device_key);
 
-  if (String(setting.device_key) !== String(device_key)) return { ok: false, code: 403, error: "Invalid device_key" };
+  if (roleKey) {
+    if (roleKey !== incoming) {
+      return { ok: false, code: 403, error: `Invalid ${role}_device_key`, role };
+    }
+    return { ok: true, role };
+  }
 
-  return { ok: true, firstSet: false };
+  // First registration for this role: allow seeding role key.
+  // Keep legacy key untouched if it already exists.
+  const setPayload = { [roleField]: incoming, updated_at: new Date() };
+  if (!legacyKey) setPayload.device_key = incoming;
+  await FarmSetting.updateOne(
+    { farm_id },
+    { $set: setPayload }
+  );
+  return { ok: true, role };
+}
+
+function inferRoleByKey(setting, device_key) {
+  const incoming = normalizeKey(device_key);
+  const sensorKey = normalizeKey(setting?.sensor_device_key);
+  const controlKey = normalizeKey(setting?.control_device_key);
+  const legacyKey = normalizeKey(setting?.device_key);
+
+  if (sensorKey && incoming === sensorKey) return "sensor";
+  if (controlKey && incoming === controlKey) return "control";
+  if (legacyKey && incoming === legacyKey) return "control";
+  if (!sensorKey && !controlKey && !legacyKey) return "control";
+  return "";
 }
 
 /**
@@ -62,20 +107,26 @@ router.post("/status", resolveFarmId, async (req, res) => {
   try {
     const farm_id = req.farmId;
 
-    const device_key = String(req.body?.device_key || req.query?.device_key || "").trim();
+    const device_key = normalizeKey(req.body?.device_key || req.query?.device_key);
+    const requestedRole = normalizeDeviceRole(req.body?.device_role || req.query?.device_role);
     if (!device_key) return res.status(400).json({ error: "device_key missing" });
 
     const setting = await ensureFarmSetting(farm_id, device_key);
-    const v = verifyDeviceKey(setting, device_key);
-    if (!v.ok) return res.status(v.code).json({ error: v.error });
+    const roleToVerify = requestedRole || inferRoleByKey(setting, device_key);
+    if (!roleToVerify) return res.status(403).json({ error: "Invalid device_key" });
 
-    if (v.firstSet) {
-      await FarmSetting.updateOne({ farm_id }, { $set: { device_key: String(device_key), updated_at: new Date() } });
-    }
+    const v = await verifyAndSeedRoleKey({
+      farm_id,
+      setting,
+      device_key,
+      role: roleToVerify,
+    });
+    if (!v.ok) return res.status(v.code).json({ error: v.error });
 
     const update = {
       farm_id,
       device_key,
+      device_role: roleToVerify,
       last_seen_at: new Date(),
     };
 

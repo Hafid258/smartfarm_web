@@ -102,6 +102,12 @@ function lightText(percent, raw) {
   return "-";
 }
 
+function roleText(role) {
+  if (role === "sensor") return "Sensor Node";
+  if (role === "control") return "Control Node";
+  return "Unknown";
+}
+
 export default function DeviceStatus() {
   const [farms, setFarms] = useState([]);
   const [farmId, setFarmId] = useState(localStorage.getItem("admin_farmId") || "");
@@ -252,6 +258,11 @@ export default function DeviceStatus() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">IP</span>
                   <span className="font-semibold">{d.ip || "-"}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-600">ประเภทเครื่อง</span>
+                  <span className="font-semibold">{roleText(d.device_role)}</span>
                 </div>
 
                 <div className="flex justify-between">
