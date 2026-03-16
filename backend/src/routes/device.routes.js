@@ -31,6 +31,27 @@ function farmIdForStore(farm_id) {
   return oid || String(farm_id);
 }
 
+function triggerModeFromSource(source) {
+  return ["auto", "smart"].includes(String(source || "").trim()) ? "auto" : "manual";
+}
+
+function actorLabelFromCommand(cmd) {
+  if (cmd?.initiated_by_name) return cmd.initiated_by_name;
+  const source = String(cmd?.source || "").trim();
+  if (source === "admin") return "ผู้ดูแลระบบ";
+  if (source === "user") return "ผู้ใช้งาน";
+  if (source === "smart") return "ระบบอัจฉริยะ";
+  return "ระบบอัตโนมัติ";
+}
+
+function mapCommandForClient(cmd) {
+  return {
+    ...cmd,
+    actor_name: actorLabelFromCommand(cmd),
+    trigger_mode: triggerModeFromSource(cmd?.source),
+  };
+}
+
 function normalizeKey(v) {
   return String(v || "").trim();
 }
@@ -219,6 +240,7 @@ async function maybeCreateAutoSoilCommand({ farm_id, soil_moisture, setting }) {
     duration_sec,
     status: "pending",
     source: "auto",
+    initiated_by_name: "ระบบอัตโนมัติ",
     timestamp: new Date(),
     scheduled_key,
   });
@@ -606,10 +628,12 @@ secured.post("/command", async (req, res) => {
       duration_sec: duration_sec ? Number(duration_sec) : undefined,
       status: "pending",
       source: req.user?.role || "user",
+      initiated_by_user_id: req.user?._id || null,
+      initiated_by_name: req.user?.username || req.user?.email || req.user?.role || "ผู้ใช้งาน",
       timestamp: new Date(),
     });
 
-    res.json({ message: "Command queued", command: doc });
+    res.json({ message: "Command queued", command: mapCommandForClient(doc.toObject()) });
   } catch (err) {
     console.error("DEVICE COMMAND ERROR:", err);
     res.status(500).json({ error: err?.message || "Failed to send device command" });
@@ -623,13 +647,23 @@ secured.get("/commands", async (req, res) => {
     if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
 
     const limit = Math.min(parseInt(req.query.limit || "200", 10), 1000);
+    const start = req.query.start ? new Date(req.query.start) : null;
+    const end = req.query.end ? new Date(req.query.end) : null;
+    const filter = farmQueryAnyType(farm_id);
 
-    const logs = await DeviceCommand.find(farmQueryAnyType(farm_id))
+    if (start && !Number.isNaN(start.getTime())) {
+      filter.timestamp = { ...(filter.timestamp || {}), $gte: start };
+    }
+    if (end && !Number.isNaN(end.getTime())) {
+      filter.timestamp = { ...(filter.timestamp || {}), $lt: end };
+    }
+
+    const logs = await DeviceCommand.find(filter)
       .sort({ timestamp: -1 })
       .limit(limit)
       .lean();
 
-    res.json(logs);
+    res.json(logs.map(mapCommandForClient));
   } catch (err) {
     console.error("DEVICE LOG ERROR:", err);
     res.status(500).json({ error: err?.message || "Failed to fetch device commands" });
@@ -654,6 +688,7 @@ secured.post("/commands/cancel-all", async (req, res) => {
     );
 
     const source = req.user?.role || "user";
+    const initiated_by_name = req.user?.username || req.user?.email || req.user?.role || "ผู้ใช้งาน";
     await DeviceCommand.create([
       {
         farm_id: storeFarmId,
@@ -662,6 +697,8 @@ secured.post("/commands/cancel-all", async (req, res) => {
         duration_sec: 0,
         status: "pending",
         source,
+        initiated_by_user_id: req.user?._id || null,
+        initiated_by_name,
         timestamp: now,
       },
       {
@@ -671,6 +708,8 @@ secured.post("/commands/cancel-all", async (req, res) => {
         duration_sec: 0,
         status: "pending",
         source,
+        initiated_by_user_id: req.user?._id || null,
+        initiated_by_name,
         timestamp: now,
       },
     ]);
@@ -700,6 +739,7 @@ secured.post("/commands/cancel-device", async (req, res) => {
     const storeFarmId = farmIdForStore(farm_id);
     const now = new Date();
     const source = req.user?.role || "user";
+    const initiated_by_name = req.user?.username || req.user?.email || req.user?.role || "ผู้ใช้งาน";
 
     const pendingFilter = { ...farmQueryAnyType(farm_id), status: "pending", device_id };
     const pendingCount = await DeviceCommand.countDocuments(pendingFilter);
@@ -716,6 +756,8 @@ secured.post("/commands/cancel-device", async (req, res) => {
       duration_sec: 0,
       status: "pending",
       source,
+      initiated_by_user_id: req.user?._id || null,
+      initiated_by_name,
       timestamp: now,
     });
 

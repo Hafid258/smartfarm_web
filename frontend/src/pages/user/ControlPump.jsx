@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api.js";
 import Card from "../../components/ui/Card.jsx";
 import Button from "../../components/ui/Button.jsx";
@@ -7,6 +7,8 @@ import Spinner from "../../components/ui/Spinner.jsx";
 import Input from "../../components/ui/Input.jsx";
 import { useToast } from "../../components/ui/ToastProvider.jsx";
 
+const PAGE_SIZE = 7;
+
 function isSameDay(ts, dateStr) {
   if (!dateStr) return true;
   if (!ts) return false;
@@ -14,11 +16,7 @@ function isSameDay(ts, dateStr) {
   const d = new Date(ts);
   const [y, m, day] = dateStr.split("-").map(Number);
 
-  return (
-    d.getFullYear() === y &&
-    d.getMonth() + 1 === m &&
-    d.getDate() === day
-  );
+  return d.getFullYear() === y && d.getMonth() + 1 === m && d.getDate() === day;
 }
 
 function todayStr() {
@@ -29,19 +27,91 @@ function todayStr() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function deviceLabel(deviceId) {
+  return deviceId === "mist" ? "เครื่องพ่นหมอก" : "ปั๊มน้ำ";
+}
+
+function statusLabel(status) {
+  if (status === "done") return "สำเร็จ";
+  if (status === "failed") return "ไม่สำเร็จ";
+  return "รอดำเนินการ";
+}
+
+function statusVariant(status) {
+  if (status === "done") return "green";
+  if (status === "failed") return "red";
+  return "gray";
+}
+
+function triggerLabel(mode) {
+  return mode === "auto" ? "ระบบสั่งเอง" : "สั่งมือ";
+}
+
+function triggerVariant(mode) {
+  return mode === "auto" ? "yellow" : "blue";
+}
+
+function PaginationBar({ page, totalPages, startIndex, endIndex, totalItems, onChange }) {
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  return (
+    <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sm text-slate-600">
+        แสดงรายการ <span className="font-semibold text-slate-900">{startIndex}-{endIndex}</span> จาก <span className="font-semibold text-slate-900">{totalItems}</span> รายการ
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(page - 1)}
+          disabled={page <= 1}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ก่อนหน้า
+        </button>
+
+        {pageNumbers.map((pageNumber) => (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onChange(pageNumber)}
+            className={[
+              "min-w-[42px] rounded-xl px-3 py-2 text-sm font-semibold transition",
+              pageNumber === page
+                ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-white shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
+                : "border border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:text-cyan-700",
+            ].join(" ")}
+          >
+            {pageNumber}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => onChange(page + 1)}
+          disabled={page >= totalPages}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-cyan-300 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ถัดไป
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ControlPump() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [loadingLog, setLoadingLog] = useState(true);
   const [err, setErr] = useState("");
-
-  const [duration, setDuration] = useState(10); // seconds
-  const [mistDuration, setMistDuration] = useState(10); // seconds
+  const [duration, setDuration] = useState(10);
+  const [mistDuration, setMistDuration] = useState(10);
   const [logs, setLogs] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [settings, setSettings] = useState(null);
   const [autoBusy, setAutoBusy] = useState(false);
   const [pauseBusy, setPauseBusy] = useState(false);
+  const [page, setPage] = useState(1);
 
   async function loadAll() {
     setErr("");
@@ -66,9 +136,9 @@ export default function ControlPump() {
 
   const availableDates = useMemo(() => {
     const set = new Set();
-    logs.forEach((x) => {
-      if (!x?.timestamp) return;
-      const d = new Date(x.timestamp);
+    logs.forEach((item) => {
+      if (!item?.timestamp) return;
+      const d = new Date(item.timestamp);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const dd = String(d.getDate()).padStart(2, "0");
@@ -84,18 +154,24 @@ export default function ControlPump() {
 
   const filteredLogs = useMemo(() => {
     if (!selectedDate) return logs;
-    return logs.filter((x) => isSameDay(x.timestamp, selectedDate));
+    return logs.filter((item) => isSameDay(item.timestamp, selectedDate));
   }, [logs, selectedDate]);
 
-  function deviceLabel(deviceId) {
-    return deviceId === "mist" ? "เครื่องพ่นหมอก" : "ปั๊มน้ำ";
-  }
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDate, logs]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const startOffset = (currentPage - 1) * PAGE_SIZE;
+  const pageLogs = filteredLogs.slice(startOffset, startOffset + PAGE_SIZE);
+  const rangeStart = filteredLogs.length === 0 ? 0 : startOffset + 1;
+  const rangeEnd = filteredLogs.length === 0 ? 0 : Math.min(startOffset + PAGE_SIZE, filteredLogs.length);
 
   async function sendCommand(command, deviceId = "pump", customDuration) {
     try {
       setBusy(true);
-      const durationValue =
-        command === "ON" ? Number(customDuration ?? duration) || undefined : undefined;
+      const durationValue = command === "ON" ? Number(customDuration ?? duration) || undefined : undefined;
       await api.post("/device/command", {
         command,
         device_id: deviceId,
@@ -116,11 +192,10 @@ export default function ControlPump() {
       if (!settings) return;
       setAutoBusy(true);
       const next = !settings.auto_soil_enabled;
-      const payload = {
+      await api.post("/settings/my", {
         ...settings,
         auto_soil_enabled: next,
-      };
-      await api.post("/settings/my", payload);
+      });
       toast.success(next ? "เปิดระบบรดน้ำตามความชื้นแล้ว" : "ปิดระบบรดน้ำตามความชื้นแล้ว");
       await loadAll();
     } catch (e) {
@@ -156,7 +231,7 @@ export default function ControlPump() {
       toast.success("สั่งปั๊มทำงานต่อแล้ว");
       await loadAll();
     } catch (e) {
-      toast.error(e.message || "สั่งต่อไม่สำเร็จ");
+      toast.error(e.message || "สั่งทำงานต่อไม่สำเร็จ");
     } finally {
       setPauseBusy(false);
     }
@@ -183,9 +258,7 @@ export default function ControlPump() {
         device_id: deviceId,
       });
       const canceled = Number(res?.data?.canceled_pending || 0);
-      toast.success(
-        `ยกเลิกคิว${deviceLabel(deviceId)} ${canceled} รายการ และสั่งหยุดอุปกรณ์แล้ว`
-      );
+      toast.success(`ยกเลิกคิว${deviceLabel(deviceId)} ${canceled} รายการ และสั่งหยุดอุปกรณ์แล้ว`);
       await loadAll();
     } catch (e) {
       toast.error(e.message || "ยกเลิกรายการไม่สำเร็จ");
@@ -199,7 +272,7 @@ export default function ControlPump() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-2xl font-bold text-gray-900">ควบคุมการรดน้ำ</div>
-          <div className="text-sm text-gray-500">สั่งรดน้ำผักบุ้ง และดูประวัติการรดน้ำ</div>
+          <div className="text-sm text-gray-500">สั่งรดน้ำหรือพ่นหมอก พร้อมดูประวัติย้อนหลังแบบแบ่งหน้า 7 รายการต่อครั้ง</div>
         </div>
         <Button variant="outline" onClick={loadAll} disabled={loadingLog}>
           รีเฟรชประวัติ
@@ -208,17 +281,15 @@ export default function ControlPump() {
 
       <Card className="p-5">
         <div className="text-lg font-semibold text-gray-900">แผงควบคุมอุปกรณ์</div>
-        <div className="text-sm text-gray-500 mt-1">
-          แยกควบคุมปั๊มน้ำและพ่นหมอก พร้อมคำสั่งระบบในจุดเดียว
-        </div>
+        <div className="mt-1 text-sm text-gray-500">แยกควบคุมปั๊มน้ำและเครื่องพ่นหมอก พร้อมคำสั่งยกเลิกคิวหรือพักระบบ</div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-gray-200 p-4">
             <div className="font-semibold text-gray-900">ปั๊มน้ำ</div>
-            <div className="text-xs text-gray-500 mt-1">กำหนดเวลาและสั่งเปิด/ปิดปั๊มน้ำ</div>
+            <div className="mt-1 text-xs text-gray-500">กำหนดเวลาและสั่งเปิดหรือปิดปั๊มน้ำ</div>
 
             <div className="mt-3">
-              <div className="text-sm text-gray-600 mb-1">เวลารดน้ำต่อครั้ง (วินาที)</div>
+              <div className="mb-1 text-sm text-gray-600">เวลารดน้ำต่อครั้ง (วินาที)</div>
               <Input
                 type="number"
                 min={1}
@@ -227,10 +298,10 @@ export default function ControlPump() {
                 onChange={(e) => setDuration(e.target.value)}
                 placeholder="เช่น 10"
               />
-              <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1-3600 วินาที</div>
+              <div className="mt-1 text-xs text-gray-400">ใส่ได้ 1-3600 วินาที</div>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button onClick={() => sendCommand("ON")} disabled={busy}>
                 {busy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
               </Button>
@@ -242,10 +313,10 @@ export default function ControlPump() {
 
           <div className="rounded-2xl border border-gray-200 p-4">
             <div className="font-semibold text-gray-900">เครื่องพ่นหมอก</div>
-            <div className="text-xs text-gray-500 mt-1">กำหนดเวลาและสั่งเปิด/ปิดพ่นหมอก</div>
+            <div className="mt-1 text-xs text-gray-500">กำหนดเวลาและสั่งเปิดหรือปิดเครื่องพ่นหมอก</div>
 
             <div className="mt-3">
-              <div className="text-sm text-gray-600 mb-1">เวลาพ่นหมอกต่อครั้ง (วินาที)</div>
+              <div className="mb-1 text-sm text-gray-600">เวลาพ่นหมอกต่อครั้ง (วินาที)</div>
               <Input
                 type="number"
                 min={1}
@@ -254,10 +325,10 @@ export default function ControlPump() {
                 onChange={(e) => setMistDuration(e.target.value)}
                 placeholder="เช่น 10"
               />
-              <div className="text-xs text-gray-400 mt-1">ใส่ได้ 1-3600 วินาที</div>
+              <div className="mt-1 text-xs text-gray-400">ใส่ได้ 1-3600 วินาที</div>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button onClick={() => sendCommand("ON", "mist", mistDuration)} disabled={busy}>
                 {busy ? "กำลังส่ง..." : "เปิดพ่นหมอก"}
               </Button>
@@ -270,24 +341,19 @@ export default function ControlPump() {
 
         <div className="mt-4 rounded-2xl border border-gray-200 p-4">
           <div className="font-semibold text-gray-900">คำสั่งระบบ</div>
-          <div className="text-xs text-gray-500 mt-1">ใช้กรณีต้องพักระบบหรือหยุดงาน โดยแยกตามอุปกรณ์</div>
+          <div className="mt-1 text-xs text-gray-500">ใช้กรณีต้องหยุดงานชั่วคราว หรือยกเลิกคิวการทำงานที่ยังไม่เริ่ม</div>
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div className="rounded-xl border border-gray-200 p-3">
               <div className="text-sm font-semibold text-gray-900">ปั๊มน้ำ</div>
-              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button variant="outline" onClick={pausePump} disabled={pauseBusy}>
                   {pauseBusy ? "กำลังส่ง..." : "พักระบบรดน้ำ"}
                 </Button>
                 <Button variant="outline" onClick={resumePump} disabled={pauseBusy}>
                   {pauseBusy ? "กำลังส่ง..." : "ทำงานต่อ"}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => cancelDeviceCommands("pump")}
-                  disabled={busy}
-                  className="sm:col-span-2"
-                >
+                <Button variant="outline" onClick={() => cancelDeviceCommands("pump")} disabled={busy} className="sm:col-span-2">
                   {busy ? "กำลังส่ง..." : "ยกเลิกคิวปั๊มน้ำ"}
                 </Button>
               </div>
@@ -295,19 +361,14 @@ export default function ControlPump() {
 
             <div className="rounded-xl border border-gray-200 p-3">
               <div className="text-sm font-semibold text-gray-900">เครื่องพ่นหมอก</div>
-              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button variant="outline" onClick={() => sendCommand("PAUSE", "mist")} disabled={busy}>
                   {busy ? "กำลังส่ง..." : "พักระบบพ่นหมอก"}
                 </Button>
                 <Button variant="outline" onClick={() => sendCommand("RESUME", "mist")} disabled={busy}>
                   {busy ? "กำลังส่ง..." : "ทำงานต่อ"}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => cancelDeviceCommands("mist")}
-                  disabled={busy}
-                  className="sm:col-span-2"
-                >
+                <Button variant="outline" onClick={() => cancelDeviceCommands("mist")} disabled={busy} className="sm:col-span-2">
                   {busy ? "กำลังส่ง..." : "ยกเลิกคิวพ่นหมอก"}
                 </Button>
               </div>
@@ -323,12 +384,15 @@ export default function ControlPump() {
       </Card>
 
       <Card className="p-5">
-        <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold text-gray-900">ประวัติการรดน้ำ</div>
-          <Badge variant="gray">บันทึกการรดน้ำ</Badge>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold text-gray-900">ประวัติการใช้งาน</div>
+            <div className="mt-1 text-sm text-gray-500">แสดงครั้งละ 7 รายการ พร้อมหน้า 1, หน้า 2, หน้า 3 ต่อเนื่องตามลำดับจริง</div>
+          </div>
+          <Badge variant="gray">บันทึกการใช้งาน</Badge>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2 items-center">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={toggleAutoSoil} disabled={autoBusy || !settings}>
             {autoBusy
               ? "กำลังอัปเดต..."
@@ -339,17 +403,17 @@ export default function ControlPump() {
           {settings?.pump_paused ? <Badge variant="yellow">ปั๊มถูกพักชั่วคราว</Badge> : null}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2 items-center">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <select
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="border rounded-xl px-3 py-2 text-sm bg-white"
+            className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
             title="เลือกวันที่"
           >
             <option value="">แสดงทั้งหมด</option>
-            {availableDates.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            {availableDates.map((date) => (
+              <option key={date} value={date}>
+                {date}
               </option>
             ))}
           </select>
@@ -357,8 +421,8 @@ export default function ControlPump() {
           <Button
             variant="outline"
             onClick={() => {
-              const t = todayStr();
-              if (availableDates.includes(t)) setSelectedDate(t);
+              const today = todayStr();
+              if (availableDates.includes(today)) setSelectedDate(today);
             }}
           >
             วันนี้
@@ -369,60 +433,75 @@ export default function ControlPump() {
           </Button>
         </div>
 
-        {loadingLog && (
+        {loadingLog ? (
           <div className="mt-4 flex items-center gap-2 text-gray-600">
             <Spinner />
             <div>กำลังโหลด...</div>
           </div>
-        )}
+        ) : null}
 
-        {!loadingLog && err && (
+        {!loadingLog && err ? (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {err}
           </div>
-        )}
+        ) : null}
 
-        {!loadingLog && !err && filteredLogs.length === 0 && (
-          <div className="mt-4 text-sm text-gray-500">ยังไม่มีประวัติคำสั่ง</div>
-        )}
-
-        {!loadingLog && !err && filteredLogs.length > 0 && (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-gray-500">
-                <tr className="border-b">
-                  <th className="py-2 pr-4">เวลา</th>
-                  <th className="py-2 pr-4">อุปกรณ์</th>
-                  <th className="py-2 pr-4">คำสั่ง</th>
-                  <th className="py-2 pr-4">ระยะเวลา</th>
-                  <th className="py-2 pr-4">สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.map((l) => (
-                  <tr key={l._id} className="border-b last:border-b-0">
-                    <td className="py-2 pr-4 text-gray-700">
-                      {l.timestamp ? new Date(l.timestamp).toLocaleString() : "-"}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700">{deviceLabel(l.device_id || "pump")}</td>
-                    <td className="py-2 pr-4">
-                      <Badge variant={l.command === "ON" ? "green" : "red"}>{l.command || "-"}</Badge>
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700">{l.duration_sec ?? "-"}</td>
-                    <td className="py-2 pr-4">
-                      <Badge variant={l.status === "success" ? "green" : l.status === "fail" ? "red" : "gray"}>
-                        {l.status || "unknown"}
-                      </Badge>
-                      {l.error_message ? (
-                        <div className="text-xs text-red-600 mt-1">{l.error_message}</div>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {!loadingLog && !err && filteredLogs.length === 0 ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-sm text-gray-500">
+            ยังไม่มีประวัติคำสั่ง
           </div>
-        )}
+        ) : null}
+
+        {!loadingLog && !err && filteredLogs.length > 0 ? (
+          <>
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200/80">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-left text-gray-500">
+                  <tr className="border-b border-slate-200">
+                    <th className="px-4 py-3 pr-4">เวลา</th>
+                    <th className="px-4 py-3 pr-4">อุปกรณ์</th>
+                    <th className="px-4 py-3 pr-4">คำสั่ง</th>
+                    <th className="px-4 py-3 pr-4">ใครเป็นคนสั่ง</th>
+                    <th className="px-4 py-3 pr-4">ประเภท</th>
+                    <th className="px-4 py-3 pr-4">ระยะเวลา</th>
+                    <th className="px-4 py-3 pr-4">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageLogs.map((log) => (
+                    <tr key={log._id} className="border-b border-slate-100 last:border-b-0">
+                      <td className="px-4 py-3 pr-4 text-gray-700">{log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"}</td>
+                      <td className="px-4 py-3 pr-4 text-gray-700">{deviceLabel(log.device_id || "pump")}</td>
+                      <td className="px-4 py-3 pr-4">
+                        <Badge variant={log.command === "ON" ? "green" : log.command === "OFF" ? "red" : "blue"}>
+                          {log.command || "-"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 pr-4 text-gray-700">{log.actor_name || "-"}</td>
+                      <td className="px-4 py-3 pr-4">
+                        <Badge variant={triggerVariant(log.trigger_mode)}>{triggerLabel(log.trigger_mode)}</Badge>
+                      </td>
+                      <td className="px-4 py-3 pr-4 text-gray-700">{log.duration_sec ?? "-"}</td>
+                      <td className="px-4 py-3 pr-4">
+                        <Badge variant={statusVariant(log.status)}>{statusLabel(log.status)}</Badge>
+                        {log.error_message ? <div className="mt-1 text-xs text-red-600">{log.error_message}</div> : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <PaginationBar
+              page={currentPage}
+              totalPages={totalPages}
+              startIndex={rangeStart}
+              endIndex={rangeEnd}
+              totalItems={filteredLogs.length}
+              onChange={setPage}
+            />
+          </>
+        ) : null}
       </Card>
     </div>
   );

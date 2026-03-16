@@ -2,6 +2,7 @@ import express from "express";
 import SensorData from "../models/SensorData.js";
 import IndexData from "../models/IndexData.js";
 import Notification from "../models/Notification.js";
+import DeviceCommand from "../models/DeviceCommand.js";
 import { requireAuth } from "../middleware/auth.js";
 import { resolveFarmId } from "../middleware/resolveFarmId.js";
 
@@ -65,6 +66,102 @@ function monthRangeFromYm(ym) {
   const end = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0));
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
   return { start, end };
+}
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function startOfWeekUtc(d) {
+  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+  const dow = x.getUTCDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  x.setUTCDate(x.getUTCDate() + diff);
+  return x;
+}
+
+function weekRangeFromYmd(ymd) {
+  const day = dayRangeFromYmd(ymd);
+  if (!day) return null;
+  const start = startOfWeekUtc(day.start);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 7);
+  return { start, end };
+}
+
+function reportRangeFromQuery(period, query = {}) {
+  const mode = String(period || "day").trim().toLowerCase();
+  if (mode === "week") {
+    const date = String(query.date || todayYmd()).trim();
+    const range = weekRangeFromYmd(date);
+    return range ? { ...range, period: "week", label: `สัปดาห์ของ ${date}` } : null;
+  }
+  if (mode === "month") {
+    const month = String(query.month || todayYmd().slice(0, 7)).trim();
+    const range = monthRangeFromYm(month);
+    return range ? { ...range, period: "month", label: `เดือน ${month}` } : null;
+  }
+  const date = String(query.date || todayYmd()).trim();
+  const range = dayRangeFromYmd(date);
+  return range ? { ...range, period: "day", label: `วันที่ ${date}` } : null;
+}
+
+function commandActorLabel(cmd) {
+  if (cmd?.initiated_by_name) return cmd.initiated_by_name;
+  const source = String(cmd?.source || "").trim();
+  if (source === "admin") return "ผู้ดูแลระบบ";
+  if (source === "user") return "ผู้ใช้งาน";
+  if (source === "smart") return "ระบบอัจฉริยะ";
+  return "ระบบอัตโนมัติ";
+}
+
+function commandTriggerMode(source) {
+  return ["auto", "smart"].includes(String(source || "").trim()) ? "auto" : "manual";
+}
+
+async function buildFarmSummary(farm_id, start, end) {
+  const [sensorAgg, commandAgg] = await Promise.all([
+    SensorData.aggregate([
+      { $match: { farm_id, timestamp: { $gte: start, $lt: end } } },
+      {
+        $group: {
+          _id: null,
+          avg_temperature: { $avg: "$temperature" },
+          avg_humidity_air: { $avg: "$humidity_air" },
+          avg_light_lux: { $avg: "$light_lux" },
+          samples: { $sum: 1 },
+        },
+      },
+    ]),
+    DeviceCommand.aggregate([
+      {
+        $match: {
+          farm_id,
+          timestamp: { $gte: start, $lt: end },
+          command: "ON",
+          status: "done",
+        },
+      },
+      {
+        $group: {
+          _id: "$device_id",
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+  ]);
+
+  const sensor = sensorAgg[0] || {};
+  const commandMap = Object.fromEntries(commandAgg.map((x) => [String(x._id || ""), Number(x.count || 0)]));
+
+  return {
+    watering_count: commandMap.pump || 0,
+    mist_count: commandMap.mist || 0,
+    avg_temperature: sensor.avg_temperature ?? null,
+    avg_humidity_air: sensor.avg_humidity_air ?? null,
+    avg_light_lux: sensor.avg_light_lux ?? null,
+    sensor_samples: Number(sensor.samples || 0),
+  };
 }
 
 async function distinctMonths(Model, farm_id, field) {
@@ -305,6 +402,97 @@ router.get("/available-months", async (req, res) => {
   } catch (err) {
     console.error("AVAILABLE MONTHS ERROR:", err);
     return res.status(500).json({ error: "Failed to fetch available months" });
+  }
+});
+
+router.get("/farm-summary", async (req, res) => {
+  try {
+    const farm_id = req.farmId;
+    if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
+
+    const range = reportRangeFromQuery("day", req.query);
+    if (!range) {
+      return res.status(400).json({ error: "invalid date format", detail: "use YYYY-MM-DD" });
+    }
+
+    const summary = await buildFarmSummary(farm_id, range.start, range.end);
+    return res.json({
+      period: "day",
+      label: range.label,
+      start: range.start,
+      end: range.end,
+      summary,
+    });
+  } catch (err) {
+    console.error("FARM SUMMARY ERROR:", err);
+    return res.status(500).json({ error: "Failed to fetch farm summary" });
+  }
+});
+
+router.get("/report", async (req, res) => {
+  try {
+    const farm_id = req.farmId;
+    if (!farm_id) return res.status(400).json({ error: "farm_id missing" });
+
+    const range = reportRangeFromQuery(req.query.period, req.query);
+    if (!range) {
+      return res.status(400).json({ error: "invalid range format", detail: "use date=YYYY-MM-DD or month=YYYY-MM" });
+    }
+
+    const [summary, commandAgg, recentCommands] = await Promise.all([
+      buildFarmSummary(farm_id, range.start, range.end),
+      DeviceCommand.aggregate([
+        {
+          $match: {
+            farm_id,
+            timestamp: { $gte: range.start, $lt: range.end },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              source: "$source",
+              device_id: "$device_id",
+              command: "$command",
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.device_id": 1, "_id.command": 1 } },
+      ]),
+      DeviceCommand.find({
+        farm_id,
+        timestamp: { $gte: range.start, $lt: range.end },
+      })
+        .sort({ timestamp: -1 })
+        .limit(200)
+        .lean(),
+    ]);
+
+    const commands = recentCommands.map((cmd) => ({
+      ...cmd,
+      actor_name: commandActorLabel(cmd),
+      trigger_mode: commandTriggerMode(cmd.source),
+    }));
+
+    return res.json({
+      period: range.period,
+      label: range.label,
+      start: range.start,
+      end: range.end,
+      summary,
+      command_breakdown: commandAgg.map((x) => ({
+        source: x?._id?.source || "-",
+        trigger_mode: commandTriggerMode(x?._id?.source),
+        device_id: x?._id?.device_id || "-",
+        command: x?._id?.command || "-",
+        count: Number(x?.count || 0),
+      })),
+      commands,
+    });
+  } catch (err) {
+    console.error("REPORT ERROR:", err);
+    return res.status(500).json({ error: "Failed to fetch report" });
   }
 });
 

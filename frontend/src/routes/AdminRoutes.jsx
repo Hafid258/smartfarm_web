@@ -10,6 +10,7 @@ import NotificationsMonitor from "../pages/admin/NotificationsMonitor.jsx";
 import DeviceCommandsLog from "../pages/admin/DeviceCommandsLog.jsx";
 import DeviceStatus from "../pages/admin/DeviceStatus.jsx";
 import AlertRules from "../pages/admin/AlertRules.jsx";
+import Reports from "../pages/admin/Reports.jsx";
 
 export default function AdminRoutes() {
   return (
@@ -26,6 +27,7 @@ export default function AdminRoutes() {
         <Route path="commands" element={<DeviceCommandsLog />} />
         <Route path="device-status" element={<DeviceStatus />} />
         <Route path="alert-rules" element={<AlertRules />} />
+        <Route path="reports" element={<Reports />} />
         
 
         <Route path="*" element={<Navigate to="dashboard" replace />} />

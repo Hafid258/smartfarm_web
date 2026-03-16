@@ -64,6 +64,7 @@ export async function runScheduleTick() {
         duration_sec,
         status: "pending",
         source: "auto",
+        initiated_by_name: "ระบบอัตโนมัติ",
         timestamp: new Date(),
         scheduled_key,
       });

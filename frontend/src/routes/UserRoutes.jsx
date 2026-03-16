@@ -7,6 +7,7 @@ import ControlPump from "../pages/user/ControlPump.jsx";
 import Settings from "../pages/user/Settings.jsx";
 import Profile from "../pages/user/Profile.jsx";
 import DeviceStatus from "../pages/user/DeviceStatus.jsx";
+import Reports from "../pages/user/Reports.jsx";
 
 export default function UserRoutes() {
   return (
@@ -19,6 +20,7 @@ export default function UserRoutes() {
         <Route path="notifications" element={<Notifications />} />
         <Route path="control" element={<ControlPump />} />
         <Route path="device-status" element={<DeviceStatus />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
         <Route path="profile" element={<Profile />} />
 

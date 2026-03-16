@@ -37,6 +37,18 @@ const DeviceCommandSchema = new mongoose.Schema(
       default: "user",
     },
 
+    initiated_by_user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    initiated_by_name: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     // เวลาออกคำสั่ง
     timestamp: { type: Date, default: Date.now, index: true },
 
