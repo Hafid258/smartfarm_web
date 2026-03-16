@@ -159,15 +159,15 @@ function parseTimeToMinutes(v) {
 }
 
 const CHARTS = [
-  { id: "temperature", label: "เธญเธธเธ“เธซเธ เธนเธกเธดเธญเธฒเธเธฒเธจ (ยฐC)", type: "sensor", dataKey: "temperature", unit: "ยฐC" },
-  { id: "humidity_air", label: "เธเธงเธฒเธกเธเธทเนเธเธญเธฒเธเธฒเธจ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
-  { id: "soil_moisture", label: "เธเธงเธฒเธกเธเธทเนเธเธ”เธดเธ (%)", type: "sensor", dataKey: "soil_moisture", unit: "%" },
-  { id: "light_lux", label: "เนเธชเธเธ—เธตเนเธเธทเธเนเธ”เนเธฃเธฑเธ (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
+  { id: "temperature", label: "อุณหภูมิอากาศ (°C)", type: "sensor", dataKey: "temperature", unit: "°C" },
+  { id: "humidity_air", label: "ความชื้นอากาศ (%)", type: "sensor", dataKey: "humidity_air", unit: "%" },
+  { id: "soil_moisture", label: "ความชื้นดิน (%)", type: "sensor", dataKey: "soil_moisture", unit: "%" },
+  { id: "light_lux", label: "แสงที่พืชได้รับ (lux)", type: "sensor", dataKey: "light_lux", unit: "lux" },
 
-  { id: "vpd", label: "เธเธงเธฒเธกเนเธซเนเธเธเธญเธเธญเธฒเธเธฒเธจ (VPD, kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
-  { id: "gdd", label: "เธเธงเธฒเธกเธฃเนเธญเธเธชเธฐเธชเธก (GDD, ยฐC)", type: "index", dataKey: "gdd", unit: "ยฐC" },
-  { id: "dew_point", label: "เธเธธเธ”เธเนเธณเธเนเธฒเธ (ยฐC)", type: "index", dataKey: "dew_point", unit: "ยฐC" },
-  { id: "soil_drying_rate", label: "เธเธงเธฒเธกเน€เธฃเนเธงเธ—เธตเนเธ”เธดเธเนเธซเนเธ (%/เธเธฒเธ—เธต)", type: "index", dataKey: "soil_drying_rate", unit: "%/min" },
+  { id: "vpd", label: "ความแห้งของอากาศ (VPD, kPa)", type: "index", dataKey: "vpd", unit: "kPa" },
+  { id: "gdd", label: "ความร้อนสะสม (GDD, °C)", type: "index", dataKey: "gdd", unit: "°C" },
+  { id: "dew_point", label: "จุดน้ำค้าง (°C)", type: "index", dataKey: "dew_point", unit: "°C" },
+  { id: "soil_drying_rate", label: "ความเร็วที่ดินแห้ง (%/นาที)", type: "index", dataKey: "soil_drying_rate", unit: "%/min" },
 ];
 
 function getIndexInsights({ latest, indexLatest }) {
@@ -183,44 +183,44 @@ function getIndexInsights({ latest, indexLatest }) {
 
   if (vpd > 1.5) {
     insights.push({
-      title: "เธญเธฒเธเธฒเธจเนเธซเนเธเธกเธฒเธ (VPD เธชเธนเธ)",
+      title: "อากาศแห้งมาก (VPD สูง)",
       level: "danger",
-      message: "เธเธฑเธเธเธธเนเธเธเธญเธเธเธงเธฒเธกเธเธทเนเธ เธเธงเธฃเน€เธเธดเนเธกเธเธงเธฒเธกเธเธทเนเธ/เธฅเธ”เธเธงเธฒเธกเธฃเนเธญเธ เนเธฅเธฐเธ”เธนเนเธซเนเธ”เธดเธเธเธทเนเธเธเธญ",
+      message: "ผักบุ้งชอบความชื้น ควรเพิ่มความชื้นหรือลดความร้อน และดูให้ดินชื้นพอ",
     });
   } else if (vpd < 0.4) {
     insights.push({
-      title: "เธญเธฒเธเธฒเธจเธเธทเนเธเธกเธฒเธ (VPD เธ•เนเธณ)",
+      title: "อากาศชื้นมาก (VPD ต่ำ)",
       level: "warning",
-      message: "เน€เธชเธตเนเธขเธเน€เธเธทเนเธญเธฃเธฒ เธเธงเธฃเน€เธเธดเนเธกเธเธฒเธฃเธฃเธฐเธเธฒเธขเธญเธฒเธเธฒเธจ/เธเธฑเธ”เธฅเธก เนเธฅเธฐเธฅเธ”เธเธงเธฒเธกเธเธทเนเธเธชเธฐเธชเธก",
+      message: "เสี่ยงเชื้อรา ควรเพิ่มการระบายอากาศหรือพัดลม และลดความชื้นสะสม",
     });
   } else {
     insights.push({
-      title: "เธญเธฒเธเธฒเธจเธญเธขเธนเนเนเธเธเนเธงเธเน€เธซเธกเธฒเธฐเธชเธก",
+      title: "อากาศอยู่ในช่วงเหมาะสม",
       level: "good",
-      message: "เธชเธ เธฒเธเนเธงเธ”เธฅเนเธญเธกเน€เธซเธกเธฒเธฐเธ•เนเธญเธเธฒเธฃเน€เธ•เธดเธเนเธ•เธเธญเธเธเธฑเธเธเธธเนเธ เธฃเธฑเธเธฉเธฒเนเธซเนเธเธเธ—เธตเน",
+      message: "สภาพแวดล้อมเหมาะต่อการเติบโตของผักบุ้ง รักษาให้คงที่",
     });
   }
 
   const diff = temp - dew;
   if (diff <= 2) {
     insights.push({
-      title: "เน€เธชเธตเนเธขเธเน€เธเธดเธ”เธเนเธณเธเนเธฒเธ",
+      title: "เสี่ยงเกิดน้ำค้าง",
       level: "warning",
-      message: "เธเธงเธฃเน€เธเธดเนเธกเธเธฑเธ”เธฅเธก/เธฃเธฐเธเธฒเธขเธญเธฒเธเธฒเธจ เธฅเธ”เธเธงเธฒเธกเธเธทเนเธเน€เธเธทเนเธญเธฅเธ”เธเธงเธฒเธกเน€เธชเธตเนเธขเธเน€เธเธทเนเธญเธฃเธฒ",
+      message: "ควรเพิ่มพัดลมหรือการระบายอากาศ เพื่อลดความเสี่ยงเชื้อรา",
     });
   }
 
   if (soilDry > 0.3) {
     insights.push({
-      title: "เธ”เธดเธเนเธซเนเธเน€เธฃเนเธง",
+      title: "ดินแห้งเร็ว",
       level: "danger",
-      message: "เธเธงเธฃเธ•เธฃเธงเธเธฃเธฐเธเธเธเนเธณ/เน€เธเธดเนเธกเธฃเธญเธเธฃเธ”เธเนเธณ เธซเธฃเธทเธญเธเธฅเธธเธกเธ”เธดเธเธฅเธ”เธเธฒเธฃเธฃเธฐเน€เธซเธข",
+      message: "ควรตรวจระบบน้ำ เพิ่มรอบรดน้ำ หรือคลุมดินเพื่อลดการระเหย",
     });
   } else if (soilDry < 0.02 && soil > 70) {
     insights.push({
-      title: "เธ”เธดเธเธเธทเนเธเธกเธฒเธ",
+      title: "ดินชื้นมาก",
       level: "warning",
-      message: "เธฃเธฐเธงเธฑเธเธเนเธณเธเธฑเธ/เธฃเธฒเธเน€เธเนเธฒ เธญเธฒเธเธฅเธ”เธฃเธญเธเธฃเธ”เธเนเธณเนเธฅเธฐเธ•เธฃเธงเธเธเธฒเธฃเธฃเธฐเธเธฒเธขเธเนเธณ",
+      message: "ระวังน้ำขังหรือรากเน่า อาจต้องลดรอบรดน้ำและตรวจการระบายน้ำ",
     });
   }
 
@@ -287,7 +287,7 @@ export default function Dashboard() {
 
       const bust = `_=${Date.now()}`;
 
-      // โ… เธ—เธณเนเธซเนเนเธกเนเธเธฑเธเธ—เธฑเนเธเธซเธเนเธฒ เธ–เนเธฒเธเธฒเธ endpoint error
+      // ✓ เธ—เธณเนเธซเนเนเธกเนเธเธฑเธเธ—เธฑเนเธเธซเธเนเธฒ เธ–เนเธฒเธเธฒเธ endpoint error
       const results = await Promise.allSettled([
         api.get(`/sensor/latest?${bust}`),
         api.get(`/sensor/history?limit=120&${bust}`),
@@ -326,7 +326,7 @@ export default function Dashboard() {
 
       setLastUpdatedAt(new Date());
     } catch (e) {
-      setErr(e?.response?.data?.error || e.message || "เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเนเธกเนเธชเธณเน€เธฃเนเธ");
+      setErr(e?.response?.data?.error || e.message || "โหลดข้อมูลไม่สำเร็จ");
     } finally {
       if (!silent) setLoading(false);
       else setRefreshing(false);
@@ -547,21 +547,21 @@ export default function Dashboard() {
     if (tempTh !== undefined) {
       out.push({
         v: Number(latestShow.temperature) >= Number(tempTh) ? "red" : "green",
-        t: Number(latestShow.temperature) >= Number(tempTh) ? "เธญเธธเธ“เธซเธ เธนเธกเธดเธชเธนเธ" : "เธญเธธเธ“เธซเธ เธนเธกเธดเธเธเธ•เธด",
+        t: Number(latestShow.temperature) >= Number(tempTh) ? "อุณหภูมิสูง" : "อุณหภูมิปกติ",
       });
     }
 
     if (rhTh !== undefined) {
       out.push({
         v: Number(latestShow.humidity_air) >= Number(rhTh) ? "blue" : "yellow",
-        t: Number(latestShow.humidity_air) >= Number(rhTh) ? "เธเธงเธฒเธกเธเธทเนเธเธญเธฒเธเธฒเธจเธชเธนเธ" : "เธเธงเธฒเธกเธเธทเนเธเธญเธฒเธเธฒเธจเธ•เนเธณ",
+        t: Number(latestShow.humidity_air) >= Number(rhTh) ? "ความชื้นอากาศสูง" : "ความชื้นอากาศต่ำ",
       });
     }
 
     if (soilTh !== undefined) {
       out.push({
         v: Number(latestShow.soil_moisture) <= Number(soilTh) ? "red" : "green",
-        t: Number(latestShow.soil_moisture) <= Number(soilTh) ? "เธ”เธดเธเนเธซเนเธ" : "เธ”เธดเธเธเธทเนเธ",
+        t: Number(latestShow.soil_moisture) <= Number(soilTh) ? "ดินแห้ง" : "ดินชื้น",
       });
     }
 
@@ -577,10 +577,10 @@ export default function Dashboard() {
     try {
       setPumpBusy(true);
       await api.post("/device/command", { command });
-      const action = command === "ON" ? "เน€เธฃเธดเนเธกเธฃเธ”เธเนเธณ" : command === "OFF" ? "เธซเธขเธธเธ”เธฃเธ”เธเนเธณ" : command;
-      toast.success(`เธชเธฑเนเธเธเธฒเธเธเธฑเนเธกเธชเธณเน€เธฃเนเธ: ${action}`);
+      const action = command === "ON" ? "เริ่มรดน้ำ" : command === "OFF" ? "หยุดรดน้ำ" : command;
+      toast.success(`สั่งงานปั๊มสำเร็จ: ${action}`);
     } catch (e) {
-      toast.error(e?.response?.data?.error || e.message || "เธชเนเธเธเธณเธชเธฑเนเธเนเธกเนเธชเธณเน€เธฃเนเธ");
+      toast.error(e?.response?.data?.error || e.message || "ส่งคำสั่งไม่สำเร็จ");
     } finally {
       setPumpBusy(false);
     }
@@ -589,7 +589,7 @@ export default function Dashboard() {
   const exportExcel = useCallback(async () => {
     try {
       setExportBusy(true);
-      toast.info("เธเธณเธฅเธฑเธเธชเนเธเธญเธญเธเนเธเธฅเน Excel...");
+      toast.info("กำลังส่งออกไฟล์ Excel...");
 
       const baseSensorHistory = selectedDate ? filteredSensorHistory : sensorHistory;
       const baseIndexHistory = selectedDate ? filteredIndexHistory : indexHistory;
@@ -698,7 +698,7 @@ export default function Dashboard() {
 
       const hasAny = exportOptions.sensor || exportOptions.index || exportOptions.settings || exportOptions.notifications;
       if (!hasAny) {
-        toast.error("เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธญเธขเนเธฒเธเธเนเธญเธข 1 เธซเธกเธงเธ”เธเนเธญเธกเธนเธฅ");
+        toast.error("กรุณาเลือกอย่างน้อย 1 หมวดข้อมูล");
         return;
       }
 
@@ -711,10 +711,10 @@ export default function Dashboard() {
       const filename = `SmartFarm_UserDashboard${suffix}.xlsx`;
 
       saveAs(file, filename);
-      toast.success("เธชเนเธเธญเธญเธเนเธเธฅเน Excel เธชเธณเน€เธฃเนเธ ๐");
+      toast.success("ส่งออกไฟล์ Excel สำเร็จ");
     } catch (e) {
       console.error("Export Excel error:", e);
-      toast.error(e?.response?.data?.error || e.message || "เธชเนเธเธญเธญเธเนเธเธฅเนเนเธกเนเธชเธณเน€เธฃเนเธ");
+      toast.error(e?.response?.data?.error || e.message || "ส่งออกไฟล์ไม่สำเร็จ");
     } finally {
       setExportBusy(false);
     }
@@ -735,17 +735,17 @@ export default function Dashboard() {
     <div className="space-y-5 text-slate-800">
       <Modal
         open={openNotifModal}
-        title={`เนเธเนเธเน€เธ•เธทเธญเธเธฅเนเธฒเธชเธธเธ” (${notifs.length})`}
+        title={`แจ้งเตือนล่าสุด (${notifs.length})`}
         onClose={() => setOpenNotifModal(false)}
       >
         {notifs.length === 0 ? (
-          <div className="text-sm text-gray-500">เธขเธฑเธเนเธกเนเธกเธตเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธ</div>
+          <div className="text-sm text-gray-500">ยังไม่มีการแจ้งเตือน</div>
         ) : (
           <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
             {notifs.map((n) => (
               <div key={n._id} className="rounded-2xl border p-4 flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold text-gray-900">{n.alert_type || "เนเธเนเธเน€เธ•เธทเธญเธ"}</div>
+                  <div className="font-semibold text-gray-900">{n.alert_type || "แจ้งเตือน"}</div>
                   <Badge>{n.severity || "info"}</Badge>
                 </div>
                 <div className="text-sm text-gray-700">{n.details || "-"}</div>
@@ -758,24 +758,24 @@ export default function Dashboard() {
         )}
       </Modal>
 
-      <Modal open={openExportModal} title="เน€เธฅเธทเธญเธเธเนเธญเธกเธนเธฅเธ—เธตเนเธเธฐเธชเนเธเธญเธญเธ" onClose={() => setOpenExportModal(false)}>
+      <Modal open={openExportModal} title="เลือกข้อมูลที่จะส่งออก" onClose={() => setOpenExportModal(false)}>
         <div className="space-y-4 text-slate-800">
           <div>
-            <div className="text-sm text-gray-600 mb-1">เน€เธฅเธทเธญเธเน€เธ”เธทเธญเธ (เน€เธเธเธฒเธฐเน€เธ”เธทเธญเธเธ—เธตเนเธกเธตเธเนเธญเธกเธนเธฅ)</div>
+            <div className="text-sm text-gray-600 mb-1">เลือกเดือน (เฉพาะเดือนที่มีข้อมูล)</div>
             <div className="flex flex-wrap gap-2 items-center">
               <select
                 value={exportMonth}
                 onChange={(e) => setExportMonth(e.target.value)}
                 className="border rounded-xl px-3 py-2 text-sm bg-white"
               >
-                <option value="">เธ—เธธเธเน€เธ”เธทเธญเธ</option>
+                <option value="">ทุกเดือน</option>
                 {exportMonths.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
                 ))}
               </select>
-              <Button variant="outline" onClick={() => setExportMonth("")}>เธฅเนเธฒเธเน€เธ”เธทเธญเธ</Button>
+              <Button variant="outline" onClick={() => setExportMonth("")}>ล้างเดือน</Button>
             </div>
           </div>
 
@@ -786,7 +786,7 @@ export default function Dashboard() {
                 checked={exportOptions.sensor}
                 onChange={(e) => setExportOptions((p) => ({ ...p, sensor: e.target.checked }))}
               />
-              เธเธฃเธฐเธงเธฑเธ•เธดเธเนเธฒเน€เธเธเน€เธเธญเธฃเน
+              ประวัติค่าเซนเซอร์
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -794,7 +794,7 @@ export default function Dashboard() {
                 checked={exportOptions.index}
                 onChange={(e) => setExportOptions((p) => ({ ...p, index: e.target.checked }))}
               />
-              เธเนเธฒเธเธณเธเธงเธ“ (Index)
+              ค่าคำนวณ (Index)
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -802,7 +802,7 @@ export default function Dashboard() {
                 checked={exportOptions.settings}
                 onChange={(e) => setExportOptions((p) => ({ ...p, settings: e.target.checked }))}
               />
-              เธเนเธฒเธ•เธฑเนเธเธฃเธฐเธเธ
+              ค่าตั้งระบบ
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -810,7 +810,7 @@ export default function Dashboard() {
                 checked={exportOptions.notifications}
                 onChange={(e) => setExportOptions((p) => ({ ...p, notifications: e.target.checked }))}
               />
-              เธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธ
+              การแจ้งเตือน
             </label>
           </div>
 
@@ -822,10 +822,10 @@ export default function Dashboard() {
               }}
               disabled={exportBusy}
             >
-              เธชเนเธเธญเธญเธ
+              ส่งออก
             </Button>
             <Button variant="outline" onClick={() => setOpenExportModal(false)}>
-              เธขเธเน€เธฅเธดเธ
+              ยกเลิก
             </Button>
           </div>
         </div>
@@ -834,26 +834,26 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-bold text-gray-900">เธ เธฒเธเธฃเธงเธกเนเธเธฅเธเธเธฑเธเธเธธเนเธ</div>
+          <div className="text-2xl font-bold text-gray-900">ภาพรวมแปลงผักบุ้ง</div>
           <div className="text-sm text-gray-500 flex items-center gap-2">
-            <span>เธ”เธนเธเนเธญเธกเธนเธฅเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธเธฅเธนเธเธเธฑเธเธเธธเนเธเธเธญเธเธเธธเธ“</span>
-            {refreshing ? <Badge variant="blue">เธเธณเธฅเธฑเธเธญเธฑเธเน€เธ”เธ•โ€ฆ</Badge> : null}
+            <span>ดูข้อมูลสำหรับการปลูกผักบุ้งของคุณ</span>
+            {refreshing ? <Badge variant="blue">กำลังอัปเดต...</Badge> : null}
             {lastUpdatedAt ? (
-              <span className="text-xs text-gray-400">เธญเธฑเธเน€เธ”เธ•เธฅเนเธฒเธชเธธเธ”: {lastUpdatedAt.toLocaleTimeString()}</span>
+              <span className="text-xs text-gray-400">อัปเดตล่าสุด: {lastUpdatedAt.toLocaleTimeString()}</span>
             ) : null}
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 justify-end">
           <Button variant="outline" onClick={() => setOpenChartPicker(true)}>
-            เน€เธฅเธทเธญเธเธเธฃเธฒเธเธ—เธตเนเธญเธขเธฒเธเธ”เธน
+            เลือกกราฟที่อยากดู
           </Button>
 
           <Button
             variant="outline"
             onClick={() => setOpenNotifModal(true)}
             className="relative"
-            title="เนเธเนเธเน€เธ•เธทเธญเธเธฅเนเธฒเธชเธธเธ”"
+            title="แจ้งเตือนล่าสุด"
           >
             <svg
               className="h-4 w-4"
@@ -868,7 +868,7 @@ export default function Dashboard() {
               <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
               <path d="M9 17a3 3 0 0 0 6 0" />
             </svg>
-            <span className="ml-2">เนเธเนเธเน€เธ•เธทเธญเธ</span>
+            <span className="ml-2">แจ้งเตือน</span>
             {notifs.length > 0 ? (
               <span className="ml-2 min-w-6 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
                 {notifs.length}
@@ -877,7 +877,7 @@ export default function Dashboard() {
           </Button>
 
           <div className="relative" ref={exportMenuRef}>
-            <Button onClick={() => setOpenExportMenu((v) => !v)}>เธชเนเธเธญเธญเธ Excel</Button>
+            <Button onClick={() => setOpenExportMenu((v) => !v)}>ส่งออก Excel</Button>
             {openExportMenu ? (
               <div className="absolute right-0 mt-2 w-72 bg-white border rounded-2xl shadow-lg z-50 overflow-hidden">
                 <button
@@ -888,9 +888,9 @@ export default function Dashboard() {
                   }}
                   disabled={exportBusy}
                 >
-                  ๐“ เธชเนเธเธญเธญเธเธเนเธญเธกเธนเธฅเนเธเธฅเธเธเธฑเธเธเธธเนเธ (Excel)
+                  ส่งออกข้อมูลแปลงผักบุ้ง (Excel)
                   <div className="text-xs text-gray-500 mt-1">
-                    เน€เธฅเธทเธญเธเธซเธกเธงเธ”เธเนเธญเธกเธนเธฅเนเธ”เน {selectedDate ? ` (เน€เธเธเธฒเธฐเธงเธฑเธเธ—เธตเน ${selectedDate})` : ""}
+                    เลือกหมวดข้อมูลได้ {selectedDate ? ` (เฉพาะวันที่ ${selectedDate})` : ""}
                   </div>
                 </button>
               </div>
@@ -898,15 +898,15 @@ export default function Dashboard() {
           </div>
 
           <Button variant="outline" onClick={() => loadAll(false)} disabled={loading}>
-            {loading ? "เธเธณเธฅเธฑเธเนเธซเธฅเธ”..." : "เธฃเธตเน€เธเธฃเธ"}
+            {loading ? "กำลังโหลด..." : "รีเฟรช"}
           </Button>
 
-          {/* โ… user เธเธงเธเธเธธเธกเธเธฑเนเธกเนเธ”เน (เธ–เนเธฒเธญเธขเธฒเธเธเธณเธเธฑเธ”เธชเธดเธ—เธเธด เนเธซเนเธเธญเธกเน€เธกเธเธ•เน 2 เธเธธเนเธกเธเธตเนเธญเธญเธ) */}
+          {/* ✓ user เธเธงเธเธเธธเธกเธเธฑเนเธกเนเธ”เน (เธ–เนเธฒเธญเธขเธฒเธเธเธณเธเธฑเธ”เธชเธดเธ—เธเธด เนเธซเนเธเธญเธกเน€เธกเธเธ•เน 2 เธเธธเนเธกเธเธตเนเธญเธญเธ) */}
           <Button onClick={() => sendPump("ON")} disabled={pumpBusy}>
-            {pumpBusy ? "เธเธณเธฅเธฑเธเธชเนเธ..." : "เน€เธฃเธดเนเธกเธฃเธ”เธเนเธณ"}
+            {pumpBusy ? "กำลังส่ง..." : "เริ่มรดน้ำ"}
           </Button>
           <Button variant="danger" onClick={() => sendPump("OFF")} disabled={pumpBusy}>
-            {pumpBusy ? "เธเธณเธฅเธฑเธเธชเนเธ..." : "เธซเธขเธธเธ”เธฃเธ”เธเนเธณ"}
+            {pumpBusy ? "กำลังส่ง..." : "หยุดรดน้ำ"}
           </Button>
         </div>
       </div>
@@ -914,15 +914,15 @@ export default function Dashboard() {
       <Modal
         open={openChartPicker}
         onClose={() => setOpenChartPicker(false)}
-        title="เน€เธฅเธทเธญเธเธเธฃเธฒเธเธ—เธตเนเธญเธขเธฒเธเธ”เธน"
+        title="เลือกกราฟที่อยากดู"
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-gray-500">เธเธ”เน€เธเธทเนเธญเน€เธเธดเธ”/เธเธดเธ”เธเธฃเธฒเธ เธฃเธฐเธเธเธเธฐเธเธณเนเธงเนเนเธซเน</div>
+          <div className="text-sm text-gray-500">กดเพื่อเปิด/ปิดกราฟ ระบบจะจดจำการเลือกไว้ให้</div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={selectAllCharts}>เน€เธฅเธทเธญเธเธ—เธฑเนเธเธซเธกเธ”</Button>
-            <Button variant="outline" onClick={clearCharts}>เธเนเธญเธเธ—เธฑเนเธเธซเธกเธ”</Button>
-            <Button variant="outline" onClick={resetCharts}>เธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธ</Button>
+            <Button variant="outline" onClick={selectAllCharts}>เลือกทั้งหมด</Button>
+            <Button variant="outline" onClick={clearCharts}>ซ่อนทั้งหมด</Button>
+            <Button variant="outline" onClick={resetCharts}>ค่าเริ่มต้น</Button>
           </div>
         </div>
 
@@ -939,7 +939,7 @@ export default function Dashboard() {
                     : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {active ? "โ… " : "โ• "}
+                {active ? "✓ " : "+ "}
                 {c.label}
               </button>
             );
@@ -947,7 +947,7 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-3 text-xs text-gray-500">
-          เนเธชเธ”เธเธญเธขเธนเน <b>{visibleCharts.length}</b> / {CHARTS.length} เธเธฃเธฒเธ
+          แสดงอยู่ <b>{visibleCharts.length}</b> / {CHARTS.length} กราฟ
         </div>
       </Modal>
 
@@ -989,12 +989,12 @@ export default function Dashboard() {
             {timeRange === "custom" ? (
               <div className="flex flex-wrap gap-2">
                 <ClockTimePicker
-                  label="เน€เธงเธฅเธฒเน€เธฃเธดเนเธกเธ•เนเธ"
+                  label="เวลาเริ่มต้น"
                   value={customFrom}
                   onChange={setCustomFrom}
                 />
                 <ClockTimePicker
-                  label="เน€เธงเธฅเธฒเธชเธดเนเธเธชเธธเธ”"
+                  label="เวลาสิ้นสุด"
                   value={customTo}
                   onChange={setCustomTo}
                 />
@@ -1017,7 +1017,7 @@ export default function Dashboard() {
                 }
               }}
             >
-              เธงเธฑเธเธเธตเน
+              วันนี้
             </Button>
 
             <Button
@@ -1030,30 +1030,30 @@ export default function Dashboard() {
                 setCustomTo("");
               }}
             >
-              เธฅเนเธฒเธ
+              ล้าง
             </Button>
           </div>
         </div>
 
         <div className="mt-3 text-sm text-gray-700">
           {selectedDate ? (
-            <>๐“… เธเธณเธฅเธฑเธเนเธชเธ”เธเธเนเธญเธกเธนเธฅเธเธญเธเธงเธฑเธเธ—เธตเน <b>{selectedDate}</b></>
+            <>📅 กำลังแสดงข้อมูลของวันที่ <b>{selectedDate}</b></>
           ) : (
-            <>๐“… เธเธณเธฅเธฑเธเนเธชเธ”เธเธเนเธญเธกเธนเธฅเนเธเธเธฃเธงเธก</>
+            <>📅 กำลังแสดงข้อมูลแบบรวม</>
           )}
           {timeRange !== "all" ? (
             timeRange === "custom" ? (
               <>
                 {" "}
-                | โฑ๏ธ เธเนเธงเธเน€เธงเธฅเธฒ{" "}
+                | ช่วงเวลา{" "}
                 <b>
                   {customFrom || customTo
-                    ? `${customFrom || "..."} เธ–เธถเธ ${customTo || "..."}`
+                    ? `${customFrom || "..."} ถึง ${customTo || "..."}`
                     : "กำหนดเอง"}
                 </b>
               </>
             ) : (
-              <> | โฑ๏ธ เธเนเธงเธเน€เธงเธฅเธฒ <b>{timeRange.replace("h", " เธเธฑเนเธงเนเธกเธ")}</b></>
+              <> | ช่วงเวลา <b>{timeRange.replace("h", " ชั่วโมง")}</b></>
             )
           ) : null}
         </div>
@@ -1063,14 +1063,14 @@ export default function Dashboard() {
         <Card className="p-5">
           <div className="flex items-center gap-3 text-gray-700">
             <Spinner />
-            <div>เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...</div>
+            <div>กำลังโหลดข้อมูล...</div>
           </div>
         </Card>
       )}
 
       {!loading && err && (
         <Card className="p-5 border-red-200 bg-red-50">
-          <div className="text-red-700 font-medium">เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”</div>
+          <div className="text-red-700 font-medium">เกิดข้อผิดพลาด</div>
           <div className="text-red-700 text-sm mt-1">{err}</div>
         </Card>
       )}
@@ -1117,9 +1117,9 @@ export default function Dashboard() {
 
           <Card className="p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="font-semibold text-gray-800 mr-2">เธชเธ–เธฒเธเธฐ:</div>
+              <div className="font-semibold text-gray-800 mr-2">สถานะ:</div>
               {statusBadges.length === 0 ? (
-                <Badge variant="gray">เธขเธฑเธเนเธกเนเธกเธตเธเนเธญเธกเธนเธฅเน€เธเธตเธขเธเธเธญ</Badge>
+                <Badge variant="gray">ยังไม่มีข้อมูลเพียงพอ</Badge>
               ) : (
                 statusBadges.map((b, idx) => (
                   <Badge key={idx} variant={b.v}>{b.t}</Badge>
@@ -1129,28 +1129,28 @@ export default function Dashboard() {
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <SummaryCard title={<>เธญเธธเธ“เธซเธ เธนเธกเธดเธญเธฒเธเธฒเธจ<div className="text-xs text-gray-500 mt-1">- ยฐC</div></>} value={fmt(latestShow?.temperature, 1)} status={statusTemp(latestShow?.temperature)} />
-            <SummaryCard title={<>เธเธงเธฒเธกเธเธทเนเธเธญเธฒเธเธฒเธจ<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.humidity_air, 0)} status={statusRH(latestShow?.humidity_air)} />
-            <SummaryCard title={<>เธเธงเธฒเธกเธเธทเนเธเธ”เธดเธ<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.soil_moisture, 0)} status={statusSoil(latestShow?.soil_moisture)} />
-            <SummaryCard title={<>เนเธชเธเธ—เธตเนเธเธทเธเนเธ”เนเธฃเธฑเธ<div className="text-xs text-gray-500 mt-1">- lux</div></>} value={fmt(lightLuxValue(latestShow), 0)} status={statusLightLux(lightLuxValue(latestShow))} />
+            <SummaryCard title={<>อุณหภูมิอากาศ<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(latestShow?.temperature, 1)} status={statusTemp(latestShow?.temperature)} />
+            <SummaryCard title={<>ความชื้นอากาศ<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.humidity_air, 0)} status={statusRH(latestShow?.humidity_air)} />
+            <SummaryCard title={<>ความชื้นดิน<div className="text-xs text-gray-500 mt-1">- %</div></>} value={fmt(latestShow?.soil_moisture, 0)} status={statusSoil(latestShow?.soil_moisture)} />
+            <SummaryCard title={<>แสงที่พืชได้รับ<div className="text-xs text-gray-500 mt-1">- lux</div></>} value={fmt(lightLuxValue(latestShow), 0)} status={statusLightLux(lightLuxValue(latestShow))} />
 
-            <SummaryCard title={<>เธเธงเธฒเธกเนเธซเนเธเธเธญเธเธญเธฒเธเธฒเธจ (VPD)<div className="text-xs text-gray-500 mt-1">- kPa</div></>} value={fmt(indexLatestShow?.vpd, 2)} status={statusVPD(indexLatestShow?.vpd)} />
-            <SummaryCard title={<>เธเธงเธฒเธกเธฃเนเธญเธเธชเธฐเธชเธก (GDD)<div className="text-xs text-gray-500 mt-1">- ยฐC</div></>} value={fmt(indexLatestShow?.gdd, 2)} status={statusGDD(indexLatestShow?.gdd)} />
-            <SummaryCard title={<>เธเธธเธ”เธเนเธณเธเนเธฒเธ<div className="text-xs text-gray-500 mt-1">- ยฐC</div></>} value={fmt(indexLatestShow?.dew_point, 1)} status={statusDewPoint(latestShow?.temperature, indexLatestShow?.dew_point)} />
-            <SummaryCard title={<>เธเธงเธฒเธกเน€เธฃเนเธงเธ—เธตเนเธ”เธดเธเนเธซเนเธ<div className="text-xs text-gray-500 mt-1">- %/min</div></>} value={fmt(indexLatestShow?.soil_drying_rate, 3)} status={statusSoilDryingRate(indexLatestShow?.soil_drying_rate)} />
+            <SummaryCard title={<>ความแห้งของอากาศ (VPD)<div className="text-xs text-gray-500 mt-1">- kPa</div></>} value={fmt(indexLatestShow?.vpd, 2)} status={statusVPD(indexLatestShow?.vpd)} />
+            <SummaryCard title={<>ความร้อนสะสม (GDD)<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(indexLatestShow?.gdd, 2)} status={statusGDD(indexLatestShow?.gdd)} />
+            <SummaryCard title={<>จุดน้ำค้าง<div className="text-xs text-gray-500 mt-1">- °C</div></>} value={fmt(indexLatestShow?.dew_point, 1)} status={statusDewPoint(latestShow?.temperature, indexLatestShow?.dew_point)} />
+            <SummaryCard title={<>ความเร็วที่ดินแห้ง<div className="text-xs text-gray-500 mt-1">- %/min</div></>} value={fmt(indexLatestShow?.soil_drying_rate, 3)} status={statusSoilDryingRate(indexLatestShow?.soil_drying_rate)} />
           </div>
 
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-lg font-semibold text-gray-900">เธชเธฃเธธเธเธชเธณเธซเธฃเธฑเธเธเธฑเธเธเธธเนเธ</div>
-                <div className="text-sm text-gray-500">เธชเธฃเธธเธเธชเธ เธฒเธเนเธงเธ”เธฅเนเธญเธกเนเธเธเน€เธเนเธฒเนเธเธเนเธฒเธข</div>
+                <div className="text-lg font-semibold text-gray-900">สรุปสำหรับผักบุ้ง</div>
+                <div className="text-sm text-gray-500">สรุปสภาพแวดล้อมแบบเข้าใจง่าย</div>
               </div>
-              <Badge variant="blue">เธเธณเนเธเธฐเธเธณ</Badge>
+              <Badge variant="blue">คำแนะนำ</Badge>
             </div>
 
             {!latestShow || !indexLatestShow ? (
-              <div className="mt-4 text-sm text-gray-500">เธขเธฑเธเนเธกเนเธกเธตเธเนเธญเธกเธนเธฅเธเธญเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธชเธฃเธธเธ</div>
+              <div className="mt-4 text-sm text-gray-500">ยังไม่มีข้อมูลพอสำหรับการสรุป</div>
             ) : (
               <div className="mt-4 space-y-3">
                 {insights.map((it, idx) => (
@@ -1177,7 +1177,7 @@ export default function Dashboard() {
             {visibleCharts.length === 0 ? (
               <Card className="p-6 lg:col-span-2">
                 <div className="text-sm text-gray-600">
-                  เธขเธฑเธเนเธกเนเนเธ”เนเน€เธฅเธทเธญเธเธเธฃเธฒเธเธ—เธตเนเธญเธขเธฒเธเธ”เธน (เธเธ” โ€เน€เธฅเธทเธญเธเธเธฃเธฒเธเธ—เธตเนเธญเธขเธฒเธเธ”เธนโ€ เธ”เนเธฒเธเธเธ)
+                  ยังไม่ได้เลือกกราฟที่อยากดู (กด "เลือกกราฟที่อยากดู" ด้านบน)
                 </div>
               </Card>
             ) : (
@@ -1197,27 +1197,27 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 gap-4">
             <Card className="p-5">
               <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">เธเนเธฒเธ•เธฑเนเธเธฃเธฐเธเธเธฃเธ”เธเนเธณ</div>
-                <Badge variant="gray">เธ•เธฑเนเธเธเนเธฒ</Badge>
+                <div className="text-lg font-semibold text-gray-900">ค่าตั้งระบบรดน้ำ</div>
+                <Badge variant="gray">ตั้งค่า</Badge>
               </div>
 
               {!settings ? (
                 <div className="mt-3 text-sm text-gray-500">
-                  เธขเธฑเธเนเธกเนเธกเธตเธเธฒเธฃเธ•เธฑเนเธเธเนเธฒ เธซเธฃเธทเธญเธ”เธถเธเธเนเธญเธกเธนเธฅเนเธกเนเธชเธณเน€เธฃเนเธ (เนเธ•เนเธซเธเนเธฒเธเธตเนเธขเธฑเธเนเธเนเธเธฒเธเนเธ”เน)
+                  ยังไม่มีการตั้งค่า หรือดึงข้อมูลไม่สำเร็จ (แต่หน้านี้ยังใช้งานได้)
                 </div>
               ) : (
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="text-gray-500">เน€เธ•เธทเธญเธเน€เธกเธทเนเธญเธญเธธเธ“เธซเธ เธนเธกเธดเธชเธนเธเธเธงเนเธฒ</div>
-                  <div className="font-medium">{tempTh ?? "-"} ยฐC</div>
+                  <div className="text-gray-500">เตือนเมื่ออุณหภูมิสูงกว่า</div>
+                  <div className="font-medium">{tempTh ?? "-"} °C</div>
 
-                  <div className="text-gray-500">เน€เธ•เธทเธญเธเน€เธกเธทเนเธญเธเธงเธฒเธกเธเธทเนเธเธญเธฒเธเธฒเธจเธชเธนเธเธเธงเนเธฒ</div>
+                  <div className="text-gray-500">เตือนเมื่อความชื้นอากาศสูงกว่า</div>
                   <div className="font-medium">{rhTh ?? "-"} %</div>
 
-                  <div className="text-gray-500">เน€เธ•เธทเธญเธเน€เธกเธทเนเธญเธ”เธดเธเนเธซเนเธเธ•เนเธณเธเธงเนเธฒ</div>
+                  <div className="text-gray-500">เตือนเมื่อดินแห้งต่ำกว่า</div>
                   <div className="font-medium">{soilTh ?? "-"} %</div>
 
-                  <div className="text-gray-500">เธเนเธงเธเน€เธงเธฅเธฒเธงเธฑเธ”เธเนเธฒ</div>
-                  <div className="font-medium">{samplingMin ?? "-"} เธเธฒเธ—เธต</div>
+                  <div className="text-gray-500">ช่วงเวลาวัดค่า</div>
+                  <div className="font-medium">{samplingMin ?? "-"} นาที</div>
                 </div>
               )}
             </Card>
@@ -1226,9 +1226,9 @@ export default function Dashboard() {
 
           {!latestShow && filteredSensorHistory.length === 0 && (
             <Card className="p-5 bg-emerald-50 border-emerald-200">
-              <div className="font-semibold text-emerald-900">เธขเธฑเธเนเธกเนเธกเธตเธเนเธญเธกเธนเธฅเธเธฒเธเน€เธเธเน€เธเธญเธฃเน</div>
+              <div className="font-semibold text-emerald-900">ยังไม่มีข้อมูลจากเซนเซอร์</div>
               <div className="text-sm text-emerald-800 mt-1">
-                เน€เธกเธทเนเธญเธญเธธเธเธเธฃเธ“เนเธชเนเธเธเนเธญเธกเธนเธฅเน€เธเนเธฒเธกเธฒ เธซเธเนเธฒเธเธตเนเธเธฐเธญเธฑเธเน€เธ”เธ•เน€เธญเธเธ—เธธเธ 5 เธงเธดเธเธฒเธ—เธต
+                เมื่ออุปกรณ์ส่งข้อมูลเข้ามา หน้านี้จะอัปเดตอัตโนมัติทุก 5 วินาที
               </div>
             </Card>
           )}
@@ -1237,6 +1237,9 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
 
 
 

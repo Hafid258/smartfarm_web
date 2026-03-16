@@ -1,4 +1,4 @@
-import { useRef } from "react";
+Ôªøimport { useRef } from "react";
 import Card from "./ui/Card.jsx";
 import Button from "./ui/Button.jsx";
 import {
@@ -59,7 +59,7 @@ function CustomTooltip({ active, payload, label, valueFormatter, showDate }) {
         {showDate ? fmtDateTime(label) : fmtTime(label)}
       </div>
       <div className="mt-1 text-gray-700">
-        §Ë“: <b>{valueFormatter ? valueFormatter(v) : v}</b>
+        ‡∏Ñ‡πà‡∏≤: <b>{valueFormatter ? valueFormatter(v) : v}</b>
       </div>
     </div>
   );
@@ -135,15 +135,15 @@ export default function LineChartCard({
       <div className="flex items-center justify-between gap-3">
         <div className="text-lg font-bold text-gray-900">{title}</div>
         <div className="flex items-center gap-2">
-          {unit ? <div className="text-xs text-gray-500">ÀπË«¬: {unit}</div> : null}
+          {unit ? <div className="text-xs text-gray-500">‡∏´‡∏ô‡πà‡∏ß‡∏¢: {unit}</div> : null}
           <Button variant="outline" className="px-3 py-1.5 text-xs" onClick={exportChartImage}>
-             ËßÕÕ°√Ÿª
+            ‡∏™‡πà‡∏á‡∏≠‡∏≠‡∏Å‡∏£‡∏π‡∏õ
           </Button>
         </div>
       </div>
 
       {!data || data.length === 0 ? (
-        <div className="mt-4 text-sm text-gray-500">‰¡Ë¡’¢ÈÕ¡Ÿ≈„π™Ë«ß‡«≈“∑’Ë‡≈◊Õ°</div>
+        <div className="mt-4 text-sm text-gray-500">‡πÑ‡∏°‡πà‡∏°‡∏µ‡∏Ç‡πâ‡∏≠‡∏°‡∏π‡∏•‡πÉ‡∏ô‡∏ä‡πà‡∏ß‡∏á‡πÄ‡∏ß‡∏•‡∏≤‡∏ó‡∏µ‡πà‡πÄ‡∏•‡∏∑‡∏≠‡∏Å</div>
       ) : (
         <div className="mt-3 h-64" ref={chartRef}>
           <ResponsiveContainer width="100%" height="100%">
@@ -166,3 +166,4 @@ export default function LineChartCard({
     </Card>
   );
 }
+
