@@ -846,7 +846,7 @@ export default function Dashboard() {
 
         <div className="flex flex-wrap gap-2 justify-end">
           <Button variant="outline" onClick={() => setOpenChartPicker(true)}>
-            เลือกกราฟที่อยากดู
+            เลือกกราฟที่ต้องการดู
           </Button>
 
           <Button

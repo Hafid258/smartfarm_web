@@ -1224,7 +1224,7 @@ export default function Dashboard() {
               variant="outline"
               onClick={() => setOpenChartPicker(true)}
             >
-              เลือกกราฟที่อยากดู
+              เลือกกราฟที่ต้องการดู
             </Button>
 
             <Button

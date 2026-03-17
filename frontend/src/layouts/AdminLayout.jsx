@@ -6,6 +6,7 @@ function cx(...a) {
 }
 
 const links = [
+  { to: "/admin/reports", label: "หน้ารายงาน" },
   { to: "/admin/dashboard", label: "ภาพรวมระบบ" },
   { to: "/admin/users", label: "ผู้ใช้งาน" },
   { to: "/admin/farms", label: "ฟาร์ม" },
@@ -15,7 +16,6 @@ const links = [
   { to: "/admin/commands", label: "ควบคุมปั๊มน้ำ" },
   { to: "/admin/device-status", label: "สถานะอุปกรณ์" },
   { to: "/admin/alert-rules", label: "กฎการแจ้งเตือน" },
-  { to: "/admin/reports", label: "หน้ารายงาน" },
 ];
 
 export default function AdminLayout() {

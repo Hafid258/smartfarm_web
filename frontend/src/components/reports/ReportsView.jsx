@@ -20,6 +20,81 @@ function fmt(n, digits = 1) {
   return Number(n).toFixed(digits);
 }
 
+function statusTemp(temp) {
+  if (temp === null || temp === undefined || Number.isNaN(Number(temp))) return "normal";
+  const t = Number(temp);
+  if (t > 35) return "danger";
+  if (t >= 32) return "warning";
+  return "good";
+}
+
+function statusRH(rh) {
+  if (rh === null || rh === undefined || Number.isNaN(Number(rh))) return "normal";
+  const r = Number(rh);
+  if (r > 90 || r < 40) return "warning";
+  return "good";
+}
+
+function statusLightLux(lightLux) {
+  if (lightLux === null || lightLux === undefined || Number.isNaN(Number(lightLux))) return "normal";
+  const lux = Number(lightLux);
+  if (lux < 2000) return "danger";
+  if (lux < 4000) return "warning";
+  return "good";
+}
+
+const STATUS_STYLES = {
+  good: {
+    card: "border-emerald-100 bg-emerald-50/70",
+    label: "text-emerald-700",
+    value: "text-emerald-950",
+    unit: "text-emerald-800",
+    badge: "border-emerald-200 bg-emerald-100 text-emerald-800",
+    text: "เหมาะสม",
+  },
+  warning: {
+    card: "border-amber-100 bg-amber-50/80",
+    label: "text-amber-700",
+    value: "text-amber-950",
+    unit: "text-amber-800",
+    badge: "border-amber-200 bg-amber-100 text-amber-800",
+    text: "เสี่ยงปานกลาง",
+  },
+  danger: {
+    card: "border-red-100 bg-red-50/80",
+    label: "text-red-700",
+    value: "text-red-950",
+    unit: "text-red-800",
+    badge: "border-red-200 bg-red-100 text-red-800",
+    text: "เสี่ยงสูง",
+  },
+  normal: {
+    card: "border-slate-100 bg-slate-50/80",
+    label: "text-slate-600",
+    value: "text-slate-900",
+    unit: "text-slate-700",
+    badge: "border-slate-200 bg-slate-100 text-slate-700",
+    text: "ไม่มีข้อมูล",
+  },
+};
+
+function ReportStatusCard({ title, value, unit, status }) {
+  const tone = STATUS_STYLES[status] || STATUS_STYLES.normal;
+
+  return (
+    <Card className={`p-4 ${tone.card}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className={`text-sm ${tone.label}`}>{title}</div>
+        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
+          {tone.text}
+        </span>
+      </div>
+      <div className={`mt-2 text-3xl font-bold ${tone.value}`}>{value}</div>
+      <div className={`text-xs ${tone.unit}`}>{unit}</div>
+    </Card>
+  );
+}
+
 export default function ReportsView({ adminMode = false }) {
   const toast = useToast();
   const [farms, setFarms] = useState([]);
@@ -43,6 +118,10 @@ export default function ReportsView({ adminMode = false }) {
     if (!adminMode) return "ฟาร์มของฉัน";
     return farms.find((f) => String(f._id) === String(farmId))?.farm_name || "ฟาร์ม";
   }, [adminMode, farms, farmId]);
+
+  const avgTempStatus = statusTemp(report?.summary?.avg_temperature);
+  const avgHumidityStatus = statusRH(report?.summary?.avg_humidity_air);
+  const avgLightStatus = statusLightLux(report?.summary?.avg_light_lux);
 
   const loadFarms = useCallback(async () => {
     if (!adminMode) return;
@@ -131,9 +210,24 @@ export default function ReportsView({ adminMode = false }) {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Card className="p-4"><div className="text-sm text-gray-500">รดน้ำ</div><div className="mt-2 text-3xl font-bold">{report.summary?.watering_count ?? 0}</div><div className="text-xs text-gray-500">ครั้ง</div></Card>
             <Card className="p-4"><div className="text-sm text-gray-500">พ่นหมอก</div><div className="mt-2 text-3xl font-bold">{report.summary?.mist_count ?? 0}</div><div className="text-xs text-gray-500">ครั้ง</div></Card>
-            <Card className="p-4"><div className="text-sm text-gray-500">อุณหภูมิเฉลี่ย</div><div className="mt-2 text-3xl font-bold">{fmt(report.summary?.avg_temperature, 1)}</div><div className="text-xs text-gray-500">C</div></Card>
-            <Card className="p-4"><div className="text-sm text-gray-500">ความชื้นเฉลี่ย</div><div className="mt-2 text-3xl font-bold">{fmt(report.summary?.avg_humidity_air, 1)}</div><div className="text-xs text-gray-500">%</div></Card>
-            <Card className="p-4"><div className="text-sm text-gray-500">แสงเฉลี่ย</div><div className="mt-2 text-3xl font-bold">{fmt(report.summary?.avg_light_lux, 0)}</div><div className="text-xs text-gray-500">lux</div></Card>
+            <ReportStatusCard
+              title="อุณหภูมิเฉลี่ย"
+              value={fmt(report.summary?.avg_temperature, 1)}
+              unit="°C"
+              status={avgTempStatus}
+            />
+            <ReportStatusCard
+              title="ความชื้นเฉลี่ย"
+              value={fmt(report.summary?.avg_humidity_air, 1)}
+              unit="%"
+              status={avgHumidityStatus}
+            />
+            <ReportStatusCard
+              title="แสงเฉลี่ย"
+              value={fmt(report.summary?.avg_light_lux, 0)}
+              unit="lux"
+              status={avgLightStatus}
+            />
           </div>
 
           <Card className="p-5">
