@@ -16,7 +16,7 @@ export default function AdminRoutes() {
   return (
     <Routes>
       <Route element={<AdminLayout />}>
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route index element={<Navigate to="reports" replace />} />
 
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="users" element={<Users />} />
@@ -30,7 +30,7 @@ export default function AdminRoutes() {
         <Route path="reports" element={<Reports />} />
         
 
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        <Route path="*" element={<Navigate to="reports" replace />} />
       </Route>
     </Routes>
   );

@@ -56,8 +56,8 @@ export default function Login() {
       localStorage.setItem("farmId", user.farm_id || "");
       localStorage.setItem("user", JSON.stringify(user));
 
-      if (user.role === "admin") nav("/admin/dashboard");
-      else nav("/user/dashboard");
+      if (user.role === "admin") nav("/admin/reports");
+      else nav("/user/reports");
     } catch (err) {
       setError(err?.response?.data?.error || "Login failed");
     } finally {

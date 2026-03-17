@@ -12,9 +12,8 @@ import Reports from "../pages/user/Reports.jsx";
 export default function UserRoutes() {
   return (
     <Routes>
-      {/* ✅ ใส่ path="/" + index route เพื่อให้ match /user/* ได้ชัวร์ */}
       <Route path="/" element={<UserLayout />}>
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route index element={<Navigate to="reports" replace />} />
 
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="notifications" element={<Notifications />} />
@@ -24,7 +23,7 @@ export default function UserRoutes() {
         <Route path="settings" element={<Settings />} />
         <Route path="profile" element={<Profile />} />
 
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        <Route path="*" element={<Navigate to="reports" replace />} />
       </Route>
     </Routes>
   );
